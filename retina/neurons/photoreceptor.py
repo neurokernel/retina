@@ -177,7 +177,6 @@ class Photoreceptor(BaseNeuron):
 
 
     def eval(self, st=None):
-        # photons -> Metarhodopsin(X[3])
         for _ in range(self.multiple):
             if self.debug:
                 minimum = min(self.photons.get())
@@ -185,7 +184,7 @@ class Photoreceptor(BaseNeuron):
                     raise ValueError('Inputs to photoreceptor should not '
                                      'be negative, minimum value detected: {}'
                                      .format(minimum))
-            # X, V, ns -> X
+            # X, V, ns, photons -> X
             self.transduction_func.prepared_call(
                 self.grid_transduction, self.block_transduction,
                 self.randState.gpudata, self.num_neurons, self.run_dt,
