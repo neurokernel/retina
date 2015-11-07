@@ -28,8 +28,8 @@ def gen_input_norfscreen(config):
     with Timer('getting photoreceptor inputs'):
         # although not configurable one can use
         # alternatives like .get_flat_image()
-        # or .get_phase_gwn if available by
-        # manually changing command below
+        # if available by manually
+        # changing command below
         photor_inputs = input_obj.get_input(steps)
 
         config['General']['steps'] = photor_inputs[:, 0].size
