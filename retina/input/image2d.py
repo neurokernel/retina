@@ -299,7 +299,6 @@ class Natural(Image2D):
             infile.flush()
             infile.close()
 
-        print(np.max(im_v))
         return im_v
 
     # Not used, class overrides generate_2dimage
