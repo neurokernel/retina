@@ -14,9 +14,6 @@ class Photoreceptor(BaseNeuron):
     dtype = np.double
 
     def __init__(self, n_dict, V_p, input_dt, debug, LPU_id):
-        '''
-        V: pointer to gpu array location where output potential is stored
-        '''
 
         self.num_neurons = len(n_dict['id'])  # NOT n_dict['num_neurons']
 
@@ -68,7 +65,6 @@ class Photoreceptor(BaseNeuron):
     def _setup_poisson(self, seed=0):
         self.randState = curand.curand_setup(
             self.block_transduction[0]*self.num_neurons, seed)
-        self.photon_absorption_func = get_photon_absorption_func(self.dtype)
 
     def _setup_transduction(self):
 
@@ -187,13 +183,13 @@ class Photoreceptor(BaseNeuron):
             # X, V, ns, photons -> X
             self.transduction_func.prepared_call(
                 self.grid_transduction, self.block_transduction,
-                self.randState.gpudata, self.num_neurons, self.run_dt,
+                self.randState.gpudata, self.run_dt,
                 self.V_p, self.ns.gpudata, self.photons.gpudata)
 
             # X, V, I_fb -> I
             self.sum_current_func.prepared_call(
                 self.grid_transduction, self.block_transduction,
-                self.X[2].gpudata, self.num_neurons, self.num_microvilli,
+                self.X[2].gpudata, self.num_microvilli,
                 self.V_p, self.I_fb.gpudata, self.I.gpudata)
 
             # hhX, I -> hhX, V
@@ -230,51 +226,6 @@ class Photoreceptor(BaseNeuron):
 # end of photoreceptor
 
 
-def get_photon_absorption_func(dtype):
-    template = """
-
-#include "curand_kernel.h"
-extern "C" {
-__global__ void
-photon_absorption(curandStateXORWOW_t *state, short* M, int num_neurons,
-                  int num_microvilli, %(type)s* input)
-{
-    int tid = threadIdx.x;
-    int bid = blockIdx.x;
-    int bdim = blockDim.x;
-
-    // XXX What happens if bid is not within array limits?
-    %(type)s lambda = input[bid] / num_microvilli;
-
-    int n_photon;
-
-    curandStateXORWOW_t localstate = state[bdim*bid + tid];
-
-    // each thread will update the values of a few microvilli
-    // of a certain neuron with id 'bid'
-    for(int i = tid; i < num_microvilli; i += bdim)
-    {
-        n_photon = curand_poisson(&localstate, lambda);
-        if(n_photon)
-        {
-            M[i + bid * num_neurons] += n_photon;
-        }
-    }
-    state[bdim*bid + tid] = localstate;
-}
-
-}
-"""
-# Used 33 registers, 352 bytes cmem[0], 328 bytes cmem[2]
-# float: Used 47 registers, 352 bytes cmem[0], 332 bytes cmem[2]
-    mod = SourceModule(template % {"type": dtype_to_ctype(dtype)},
-                       options = ["--ptxas-options=-v"],
-                       no_extern_c = True)
-    func = mod.get_function('photon_absorption')
-    func.prepare([np.intp, np.intp, np.int32, np.int32, np.intp])
-    return func
-
-
 def get_update_ns_func(dtype):
     template = """
 
@@ -284,19 +235,16 @@ update_ns(%(type)s* g_ns, int num_neurons, %(type)s* V, %(type)s dt)
 {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if(tid < num_neurons)
-    {
+    if(tid < num_neurons) {
+
         %(type)s v = V[tid];
         %(type)s ns = g_ns[tid];
         %(type)s n_inf;
 
         if(v >= -53)
-        {
             n_inf = 8.5652*(v+53)+5;
-        } else
-        {
+        else
             n_inf = fmax%(fletter)s(1, 0.2354*(v+70)+1);
-        }
 
         g_ns[tid] = ns + (n_inf-ns)*RTAU*dt;
 
@@ -315,7 +263,8 @@ update_ns(%(type)s* g_ns, int num_neurons, %(type)s* V, %(type)s dt)
 def get_transduction_func(dtype, block_size, num_microvilli, Xaddress,
                           change_ind1, change_ind2, change1, change2):
     template = """
-
+/* This is kept for documentation purposes the actual code used is after the end
+ * of this template */
 #include "curand_kernel.h"
 
 extern "C" {
@@ -705,7 +654,7 @@ __device__ float compute_ca(int Tstar, float cstar_cc, float Vm)
 }
 
 __global__ void
-transduction(curandStateXORWOW_t *state, int ld1,
+transduction(curandStateXORWOW_t *state,
              float dt, %(type)s* d_Vm, %(type)s* g_ns, %(type)s* input)
 {
     int tid = threadIdx.x;
@@ -718,8 +667,7 @@ transduction(curandStateXORWOW_t *state, int ld1,
     __shared__ float fn[BLOCK_SIZE];
     __shared__ float lambda;
 
-    if(tid == 0)
-    {
+    if(tid == 0) {
         Vm[0] = d_Vm[bid]*1e-3;
         ns = g_ns[bid];
         lambda = input[bid]/NUM_MICROVILLI; //input must have unit photons/sec
@@ -737,10 +685,10 @@ transduction(curandStateXORWOW_t *state, int ld1,
     curandStateXORWOW_t localstate = state[BLOCK_SIZE*bid + tid];
 
     // iterate over all microvilli in one photoreceptor
-    for(int i = tid; i < NUM_MICROVILLI; i += BLOCK_SIZE)
-    {
+    for(int i = tid; i < NUM_MICROVILLI; i += BLOCK_SIZE) {
+
         // load variables that are needed for computing calcium concentration
-        tmp = ((short2*)d_X[2])[bid*ld1 + i];
+        tmp = ((short2*)d_X[2])[bid*NUM_MICROVILLI + i];
         X[tid][5] = tmp.x;
         X[tid][6] = tmp.y;
 
@@ -749,13 +697,13 @@ transduction(curandStateXORWOW_t *state, int ld1,
         fn[tid] = compute_fn( num_to_mM(X[tid][5]), ns);
 
         // load the rest of variables
-        tmp = ((short2*)d_X[1])[bid*ld1 + i];
+        tmp = ((short2*)d_X[1])[bid*NUM_MICROVILLI + i];
         X[tid][4] = tmp.y;
         X[tid][3] = tmp.x;
-        tmp = ((short2*)d_X[0])[bid*ld1 + i];
+        tmp = ((short2*)d_X[0])[bid*NUM_MICROVILLI + i];
         X[tid][2] = tmp.y;
         X[tid][1] = tmp.x;
-        X[tid][0] = ((short*)d_X[3])[bid*ld1 + i];
+        X[tid][0] = ((short*)d_X[3])[bid*NUM_MICROVILLI + i];
 
         sumrate = lambda + 54198 * Ca[tid] * (0.5 - X[tid][5] * 5.5353e-4) + 5.5 * X[tid][5]; // 11, 12
         sumrate += 25 * (1+10*fn[tid]) * X[tid][6]; // 10
@@ -777,69 +725,66 @@ transduction(curandStateXORWOW_t *state, int ld1,
         // Note that you don't have to compensate for
         // the last reaction time that exceeds dt.
         // The reason is that the exponential distribution is MEMORYLESS.
-        while(dt_advanced <= dt)
-        {
+        while (dt_advanced <= dt) {
             reaction_ind = 0;
             sumrate = curand_uniform(&localstate) * sumrate;
 
-            if(sumrate > 2e-5)
-            {
+            if (sumrate > 2e-5) {
                 sumrate -= lambda;
                 reaction_ind = (sumrate<=2e-5) * 13;
 
-                if(!reaction_ind)
-                {
-
+                if (!reaction_ind) {
                     sumrate -= mM_to_num(30) * Ca[tid] * (0.5 - num_to_mM(X[tid][5]) );
                     reaction_ind = (sumrate<=2e-5) * 11;
 
-                    if(!reaction_ind)
-                    {
-                        sumrate -= mM_to_num(5.5) * num_to_mM(X[tid][5]) ;
+                    if (!reaction_ind) {
+                        sumrate -= mM_to_num(5.5) * num_to_mM(X[tid][5]);
                         reaction_ind = (sumrate<=2e-5) * 12;
-                        if(!reaction_ind)
-                        {
-                            sumrate -= 25 * (1+10*fn[tid]) * X[tid][6] ;
+
+                        if (!reaction_ind) {
+                            sumrate -= 25 * (1+10*fn[tid]) * X[tid][6];
                             reaction_ind = (sumrate<=2e-5) * 10;
-                            if(!reaction_ind)
-                            {
-                                sumrate -= 4 * (1+37.8*fn[tid]) * X[tid][4] ;
+
+                            if (!reaction_ind) {
+                                sumrate -= 4 * (1+37.8*fn[tid]) * X[tid][4];
                                 reaction_ind = (sumrate<=2e-5) * 8;
 
-                                if(!reaction_ind)
-                                {
-                                    sumrate -= 144 * (1+11.1*fn[tid]) * X[tid][3] ;
+                                if (!reaction_ind) {
+                                    sumrate -= 144 * (1+11.1*fn[tid]) * X[tid][3];
                                     reaction_ind = (sumrate<=2e-5) * 7;
-                                    if(!reaction_ind)
-                                    {
+
+                                    if (!reaction_ind) {
                                         sumrate -= 3.7*(1+40*fn[tid]) * X[tid][0];
                                         reaction_ind = (sumrate<=2e-5) * 1;
-                                        if(!reaction_ind)
-                                        {
-                                            sumrate -= 1300 * X[tid][3] ;
+
+                                        if (!reaction_ind) {
+                                            sumrate -= 1300 * X[tid][3];
                                             reaction_ind = (sumrate<=2e-5) * 6;
-                                            if(!reaction_ind)
-                                            {
-                                                sumrate -= 3.0 * X[tid][2] * X[tid][3] ;
+
+                                            if (!reaction_ind) {
+                                                sumrate -= 3.0 * X[tid][2] * X[tid][3];
                                                 reaction_ind = (sumrate<=2e-5) * 4;
 
-                                                if(!reaction_ind)
-                                                {
-                                                    sumrate -= 15.6 * X[tid][2] * (100-X[tid][3]) ;
+                                                if (!reaction_ind) {
+                                                    sumrate -= 15.6 * X[tid][2]
+                                                        * (100-X[tid][3]);
                                                     reaction_ind = (sumrate<=2e-5) * 3;
-                                                    if(!reaction_ind)
-                                                    {
-                                                        sumrate -= 3.5 * (50 - X[tid][2] - X[tid][1] - X[tid][3]) ;
+
+                                                    if (!reaction_ind) {
+                                                        sumrate -= 3.5 * (50 - X[tid][2]
+                                                            - X[tid][1] - X[tid][3]);
                                                         reaction_ind = (sumrate<=2e-5) * 5;
-                                                        if(!reaction_ind)
-                                                        {
-                                                            sumrate -= 7.05 * X[tid][1] * X[tid][0] ;
-                                                            reaction_ind = (sumrate<=2e-5) * 2;
-                                                            if(!reaction_ind)
-                                                            {
-                                                                sumrate -= 0.015 * (1+11.5*compute_fp( Ca[tid] )) * X[tid][4]*(X[tid][4]-1)*(25-X[tid][6])*0.5;
+
+                                                        if(!reaction_ind) {
+                                                            sumrate -= 7.05 * X[tid][1]
+                                                                * X[tid][0];
+                                                            reaction_ind = (sumrate<=2e-5)
+                                                                * 2;
+
+                                                            if(!reaction_ind) {
+                                                                sumrate -= 0.015 *
+                                                                    (1+11.5*compute_fp( Ca[tid] )) * X[tid][4]*(X[tid][4]-1)*(25-X[tid][6])*0.5;
                                                                 reaction_ind = (sumrate<=2e-5) * 9;
-                                                                //if(X[tid][4] < 2)
                                                             }
                                                         }
                                                     }
@@ -860,36 +805,34 @@ transduction(curandStateXORWOW_t *state, int ld1,
             ind = change_ind1[reaction_ind];
             X[tid][ind] += change1[reaction_ind];
 
-            ind = change_ind2[reaction_ind];
             //update the second one
-            if(ind != 0)
-            {
+            ind = change_ind2[reaction_ind];
+            if (ind != 0)
                 X[tid][ind] += change2[reaction_ind];
-            }
 
             // compute the advance time again
             Ca[tid] = compute_ca(X[tid][6], num_to_mM(X[tid][5]), Vm[0]);
             fn[tid] = compute_fn( num_to_mM(X[tid][5]), ns );
-            //fp[tid] = compute_fp( Ca[tid] );
 
-
-            sumrate = lambda+54198 * Ca[tid] * (0.5 - X[tid][5] * 5.5353e-4) + 5.5 * X[tid][5]; // 11, 12
-            sumrate += 25 * (1+10*fn[tid]) * X[tid][6]; // 10
-            sumrate += 4 * (1+37.8*fn[tid]) * X[tid][4] ; // 8
-            sumrate += (1444+1598.4*fn[tid]) * X[tid][3] ; // 7, 6
-            sumrate += (3.7*(1+40*fn[tid]) + 7.05 * X[tid][1]) * X[tid][0] ; // 1, 2
-            sumrate += (1560 - 12.6 * X[tid][3]) * X[tid][2]; // 3, 4
-            sumrate += 3.5 * (50 - X[tid][2] - X[tid][1] - X[tid][3]) ; // 5
-            sumrate += 0.015 * (1+11.5*compute_fp( Ca[tid] )) * X[tid][4]*(X[tid][4]-1)*(25-X[tid][6])*0.5 ; // 9
+            sumrate = lambda + 54198*Ca[tid]*(0.5 - X[tid][5]*5.5353e-4)
+                + 5.5*X[tid][5]; // 11, 12
+            sumrate += 25*(1 + 10*fn[tid])*X[tid][6]; // 10
+            sumrate += 4*(1 + 37.8*fn[tid])*X[tid][4]; // 8
+            sumrate += (1444 + 1598.4*fn[tid])*X[tid][3]; // 7, 6
+            sumrate += (3.7*(1 + 40*fn[tid]) + 7.05*X[tid][1])*X[tid][0]; // 1, 2
+            sumrate += (1560 - 12.6*X[tid][3])*X[tid][2]; // 3, 4
+            sumrate += 3.5*(50 - X[tid][2] - X[tid][1] - X[tid][3]); // 5
+            sumrate += 0.015*(1 + 11.5*compute_fp( Ca[tid] ))
+                *X[tid][4]*(X[tid][4] - 1)*(25 - X[tid][6])*0.5; // 9
 
             dt_advanced -= logf(curand_uniform(&localstate))/(LA+sumrate);
 
         } // end while
 
-        ((short*)d_X[3])[bid*ld1 + i] = X[tid][0];
-        ((short2*)d_X[0])[bid*ld1 + i] = make_short2(X[tid][1], X[tid][2]);
-        ((short2*)d_X[1])[bid*ld1 + i] = make_short2(X[tid][3], X[tid][4]);
-        ((short2*)d_X[2])[bid*ld1 + i] = make_short2(X[tid][5], X[tid][6]);
+        ((short*)d_X[3])[bid*NUM_MICROVILLI + i] = X[tid][0];
+        ((short2*)d_X[0])[bid*NUM_MICROVILLI + i] = make_short2(X[tid][1], X[tid][2]);
+        ((short2*)d_X[1])[bid*NUM_MICROVILLI + i] = make_short2(X[tid][3], X[tid][4]);
+        ((short2*)d_X[2])[bid*NUM_MICROVILLI + i] = make_short2(X[tid][5], X[tid][6]);
     }
     // copy the updated random generator state back to global memory
     state[BLOCK_SIZE*bid + tid] = localstate;
@@ -919,7 +862,7 @@ transduction(curandStateXORWOW_t *state, int ld1,
     cuda.memcpy_htod(d_change1_address, change1)
     cuda.memcpy_htod(d_change2_address, change2)
 
-    func.prepare([np.intp, np.int32, np.float32, np.intp, np.intp, np.intp])
+    func.prepare([np.intp, np.float32, np.intp, np.intp, np.intp])
     func.set_cache_config(cuda.func_cache.PREFER_SHARED)
     return func
 
@@ -943,8 +886,7 @@ hh(%(type)s* I_all, %(type)s* d_V, %(type)s* d_sa, %(type)s* d_si,
 {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if(tid < num_neurons)
-    {
+    if (tid < num_neurons) {
         %(type)s I = I_all[tid];
         %(type)s V = d_V[tid];  //mV
         %(type)s sa = d_sa[tid];
@@ -956,8 +898,7 @@ hh(%(type)s* I_all, %(type)s* d_V, %(type)s* d_sa, %(type)s* d_si,
         %(type)s x_inf, tau_x, dx;
         %(type)s dt = 1000 * ddt;
 
-        for(int i = 0; i < multiple; ++i)
-        {
+        for(int i = 0; i < multiple; ++i) {
             /* The precision of power constant affects the result */
             x_inf = cbrt%(fletter)s(1/(1+exp%(fletter)s((-23.7-V)/12.8)));
             tau_x = 0.13+3.39*exp%(fletter)s(-(-73-V)*(-73-V)/400);
@@ -1019,7 +960,7 @@ def get_sum_current_func(dtype, block_size):
 #define TRP_REV 0  /* mV */
 
 __global__ void
-sum_current(short2* d_Tstar, int num_neurons, int num_microvilli, %(type)s* d_Vm,
+sum_current(short2* d_Tstar, int num_microvilli, %(type)s* d_Vm,
             %(type)s* I_fb, %(type)s* I_all)
 {
     int tid = threadIdx.x;
@@ -1029,53 +970,35 @@ sum_current(short2* d_Tstar, int num_neurons, int num_microvilli, %(type)s* d_Vm
     sum[tid] = 0;
 
     for(int i = tid; i < num_microvilli; i += BLOCK_SIZE)
-    {
-        sum[tid] += d_Tstar[i + bid*num_neurons].y;
-    }
+        sum[tid] += d_Tstar[i + bid*num_microvilli].y;
+
     __syncthreads();
 
-    if(tid < 32)
-    {
+    if (tid < 32) {
         #pragma unroll
         for(int i = 0; i < BLOCK_SIZE/32; ++i)
-        {
             sum[tid] += sum[tid + 32*i];
-        }
     }
 
-    if(tid < 16)
-    {
+    if (tid < 16)
         sum[tid] += sum[tid+16];
-    }
 
-    if(tid < 8)
-    {
+    if (tid < 8)
         sum[tid] += sum[tid+8];
-    }
 
-    if(tid < 4)
-    {
+    if (tid < 4)
         sum[tid] += sum[tid+4];
-    }
 
-    if(tid < 2)
-    {
+    if (tid < 2)
         sum[tid] += sum[tid+2];
-    }
 
-    if(tid == 0)
-    {
-        // %(type)s Vm = d_Vm[bid];
+    if (tid == 0) {
         %(type)s Vm = (d_Vm[bid]-TRP_REV) * 0.001;
         %(type)s I_in;
         if(Vm < 0)
-        {
             I_in = (sum[tid]+sum[tid+1]) * G_TRP * (-Vm);
-        }
         else
-        {
             I_in = 0;
-        }
 
         I_all[bid] = I_fb[bid] + I_in / 15.7; // convert pA into \muA/cm^2
     }
@@ -1087,6 +1010,6 @@ sum_current(short2* d_Tstar, int num_neurons, int num_microvilli, %(type)s* d_Vm
                                    "block_size": block_size},
                        options = ["--ptxas-options=-v"])
     func = mod.get_function('sum_current')
-    func.prepare([np.intp, np.int32, np.int32, np.intp, np.intp, np.intp])
+    func.prepare([np.intp, np.int32, np.intp, np.intp, np.intp])
     return func
 
