@@ -382,7 +382,7 @@ __device__ float compute_ca(int Tstar, float Cstar_cc, float Vm)
 }
 
 __global__ void
-transduction(curandStateXORWOW_t *state, int num_neurons,
+transduction(curandStateXORWOW_t *state,
              float dt, %(type)s* d_Vm, %(type)s* g_ns, %(type)s* input)
 {
     int tid = threadIdx.x;
@@ -418,7 +418,7 @@ transduction(curandStateXORWOW_t *state, int num_neurons,
     {
         // load variables that are needed for computing calcium concentration
         //Ca[tid] = ((%(type)s*)d_X[7])[bid*ld2 + i]; // no need to store calcium
-        tmp = ((short2*)d_X[2])[bid*num_neurons + i];
+        tmp = ((short2*)d_X[2])[bid*NUM_MICROVILLI + i];
         X[tid][5] = tmp.x;
         X[tid][6] = tmp.y;
 
@@ -427,13 +427,13 @@ transduction(curandStateXORWOW_t *state, int num_neurons,
         fn[tid] = compute_fn(num_to_mM(X[tid][5]), ns);
 
         // load the rest of variables
-        tmp = ((short2*)d_X[1])[bid*num_neurons + i];
+        tmp = ((short2*)d_X[1])[bid*NUM_MICROVILLI + i];
         X[tid][4] = tmp.y;
         X[tid][3] = tmp.x;
-        tmp = ((short2*)d_X[0])[bid*num_neurons + i];
+        tmp = ((short2*)d_X[0])[bid*NUM_MICROVILLI + i];
         X[tid][2] = tmp.y;
         X[tid][1] = tmp.x;
-        X[tid][0] = ((short*)d_X[3])[bid*num_neurons + i];
+        X[tid][0] = ((short*)d_X[3])[bid*NUM_MICROVILLI + i];
 
         // compute total rate of reaction
         sumrate = lambda;
@@ -584,10 +584,10 @@ transduction(curandStateXORWOW_t *state, int num_neurons,
 
         } // end while
 
-        ((short*)d_X[3])[bid*num_neurons + i] = X[tid][0];
-        ((short2*)d_X[0])[bid*num_neurons + i] = make_short2(X[tid][1], X[tid][2]);
-        ((short2*)d_X[1])[bid*num_neurons + i] = make_short2(X[tid][3], X[tid][4]);
-        ((short2*)d_X[2])[bid*num_neurons + i] = make_short2(X[tid][5], X[tid][6]);
+        ((short*)d_X[3])[bid*NUM_MICROVILLI + i] = X[tid][0];
+        ((short2*)d_X[0])[bid*NUM_MICROVILLI + i] = make_short2(X[tid][1], X[tid][2]);
+        ((short2*)d_X[1])[bid*NUM_MICROVILLI + i] = make_short2(X[tid][3], X[tid][4]);
+        ((short2*)d_X[2])[bid*NUM_MICROVILLI + i] = make_short2(X[tid][5], X[tid][6]);
     }
     // copy the updated random generator state back to global memory
     state[BLOCK_SIZE*bid + tid] = localstate;
