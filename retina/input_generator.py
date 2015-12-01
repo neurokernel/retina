@@ -20,8 +20,8 @@ class RetinaInputGenerator(object):
 
         screen = self.screen
 
-        retina_lat_file = 'retina_lat{}.h5'.format(i)
-        retina_long_file = 'retina_long{}.h5'.format(i)
+        retina_elev_file = 'retina_elev{}.h5'.format(i)
+        retina_azim_file = 'retina_azim{}.h5'.format(i)
 
         screen_dima_file = 'grid_dima{}.h5'.format(i)
         screen_dimb_file = 'grid_dimb{}.h5'.format(i)
@@ -29,11 +29,11 @@ class RetinaInputGenerator(object):
         retina_dima_file = 'retina_dima{}.h5'.format(i)
         retina_dimb_file = 'retina_dimb{}.h5'.format(i)
 
-        lat_v, long_v = retina.get_ommatidia_pos()
+        elev_v, azim_v = retina.get_ommatidia_pos()
         rfs = self.generate_receptive_fields_no_gpu()
 
-        for data, filename in [(lat_v, retina_lat_file),
-                               (long_v, retina_long_file),
+        for data, filename in [(elev_v, retina_elev_file),
+                               (azim_v, retina_azim_file),
                                (screen.grid[0], screen_dima_file),
                                (screen.grid[1], screen_dimb_file),
                                (rfs.refa, retina_dima_file),

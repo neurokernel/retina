@@ -19,9 +19,9 @@ class Ommatidium(object):
         '''
             element: ArrayElement object
         '''
-        lat, long = element.dima, element.dimb
-        self._lat = lat
-        self._long = long
+        elev, azim = element.dima, element.dimb
+        self._elev = elev
+        self._azim = azim
         self.element = element
 
         # maybe simple dic is sufficient
@@ -40,7 +40,7 @@ class Ommatidium(object):
 
     @property
     def sphere_pos(self):
-        return self._lat, self._long
+        return self._elev, self._azim
 
     @property
     def gid(self):
@@ -110,20 +110,20 @@ class RetinaArray(object):
 
     def _get_interommatidial_angle(self):
         ''' Returns angle in degrees '''
-        lat1, long1 = self._ommatidia[0].sphere_pos
+        elev1, azim1 = self._ommatidia[0].sphere_pos
         try:
-            lat2, long2 = self._ommatidia[1].sphere_pos
+            elev2, azim2 = self._ommatidia[1].sphere_pos
         except IndexError:
             # when there is only one element
             # assume interommatidial angle is 90
             return 90
 
-        x1 = np.sin(lat1)*np.cos(long1)
-        y1 = np.sin(lat1)*np.sin(long1)
-        z1 = np.cos(lat1)
-        x2 = np.sin(lat2)*np.cos(long2)
-        y2 = np.sin(lat2)*np.sin(long2)
-        z2 = np.cos(lat2)
+        x1 = np.sin(elev1)*np.cos(azim1)
+        y1 = np.sin(elev1)*np.sin(azim1)
+        z1 = np.cos(elev1)
+        x2 = np.sin(elev2)*np.cos(azim2)
+        y2 = np.sin(elev2)*np.sin(azim2)
+        z2 = np.cos(elev2)
         angle = np.arccos(x1*x2 + y1*y2 + z1*z2)
         return float(angle*180/np.pi)
 
@@ -137,10 +137,10 @@ class RetinaArray(object):
 
     def get_all_photoreceptors_dir(self):
         allphotors = self.get_all_photoreceptors()
-        latlong = np.array([photor.sphere_pos for photor in allphotors])
+        elevazim = np.array([photor.sphere_pos for photor in allphotors])
         dirs = np.array([photor.direction for photor in allphotors])
 
-        return latlong[:, 0], latlong[:, 1], dirs[:, 0], dirs[:, 1]
+        return elevazim[:, 0], elevazim[:, 1], dirs[:, 0], dirs[:, 1]
 
     def get_ommatidia_pos(self):
         positions = np.array([omm.sphere_pos for omm in self._ommatidia])
@@ -420,7 +420,7 @@ class OmmatidiumNeuron(Neuron):
     def __init__(self, ommatidium, direction, params, is_photoreceptor=True):
         '''
             ommatidium: ommatidium object
-            direction: tuple of 2 coordinates (latitude, longitude) or None
+            direction: tuple of 2 coordinates (elevation, azimuth) or None
                        direction of photoreceptor optical axis
         '''
         self.parent = ommatidium
@@ -492,12 +492,3 @@ class Synapse(object):
             del self._params['scale']
 
 
-def main():
-    import hexagon
-
-    h = hexagon.HexagonArray(num_rings=15)
-    a = RetinaArray(h)
-    print(a.num_elements, a.num_photoreceptors)
-
-if __name__ == "__main__":
-    main()

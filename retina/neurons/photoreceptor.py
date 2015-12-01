@@ -676,7 +676,6 @@ transduction(curandStateXORWOW_t *state,
     __syncthreads();
 
     float sumrate;
-    float rnumber;
     float dt_advanced;
     int reaction_ind;
     short2 tmp;
@@ -715,8 +714,6 @@ transduction(curandStateXORWOW_t *state,
         sumrate += 0.015 * (1+11.5*compute_fp( Ca[tid] )) * X[tid][4]*(X[tid][4]-1)*(25-X[tid][6])*0.5 ; // 9
 
         dt_advanced = -logf(curand_uniform(&localstate))/(LA+sumrate);
-
-        int counter = 0;
 
         // If the reaction time is smaller than dt,
         // pick the reaction and update,
