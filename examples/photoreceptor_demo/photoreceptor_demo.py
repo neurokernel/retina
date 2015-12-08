@@ -59,13 +59,13 @@ def add_LPU(config, manager):
 
     generate_gexf(config_photor, gexf_file)
 
-    n_dict_ret, s_dict_ret = LPU.lpu_parser(gexf_file)
-    worker_id = 'photoreceptor'
+    n_dict_ph, s_dict_ph = LPU.lpu_parser(gexf_file)
+    LPU_id = 'photoreceptor'
     debug = config_photor['debug']
 
     dt = config['General']['dt']
     modules = ['retina.neurons.photoreceptor']
-    manager.add(LPU, worker_id, dt, n_dict_ret, s_dict_ret,
+    manager.add(LPU, LPU_id, dt, n_dict_ph, s_dict_ph,
                 input_file=input_file, output_file=output_file,
                 device=0, debug=debug, time_sync=False,
                 modules=modules)
