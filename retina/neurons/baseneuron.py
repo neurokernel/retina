@@ -46,8 +46,6 @@ class BaseNeuron(object):
 
         self.__update_from_I = self.get_update_from_I_func(num_neurons)
         self.__update_from_g = self.get_update_from_g_func(num_neurons)
-        self.__block_get_input = (32, 32, 1)
-        self.__grid_get_input = ((num_neurons - 1) / 32 + 1, 1)
 
         self.__LPU_id = LPU_id
         self.__debug = debug
@@ -164,7 +162,7 @@ class BaseNeuron(object):
         if self.__I_pre.size > 0:
             # synapse_state(I) -> internal_state(I)
             self.__update_from_I.prepared_async_call(
-                self.__grid_get_input, self.__block_get_input, st,
+                self.__grid_get_input_I, self.__block_get_input_I, st,
                 int(synapse_state_p), self.__cum_num_dendrite_I.gpudata,
                 self.__num_dendrite_I.gpudata, self.__I_pre.gpudata,
                 internal_state.gpudata)
@@ -172,7 +170,7 @@ class BaseNeuron(object):
         if self.__g_pre.size > 0:
             # synapse_state(g) -> internal_state(I)
             self.__update_from_g.prepared_async_call(
-                self.__grid_get_input, self.__block_get_input, st,
+                self.__grid_get_input_g, self.__block_get_input_g, st,
                 int(synapse_state_p), self.__cum_num_dendrite_g.gpudata,
                 self.__num_dendrite_g.gpudata, self.__g_pre.gpudata,
                 internal_state.gpudata, int(self.__neuron_state_p),
@@ -192,13 +190,13 @@ class BaseNeuron(object):
 
     def get_update_from_g_func(self, num_neurons):
         template = """
-        #define N 32
         #define NUM_NEURONS %(num_neurons)d
 
         __global__ void get_input(double* synapse, int* cum_num_dendrite,
                                   int* num_dendrite, int* pre, double* I_pre,
                                   double* V, double* V_rev)
         {
+            // must use block size 32, 32, 1
             int tidx = threadIdx.x;
             int tidy = threadIdx.y;
             int bid = blockIdx.x;
@@ -212,7 +210,7 @@ class BaseNeuron(object):
 
             if(tidy == 0)
             {
-                neuron = bid * N + tidx;
+                neuron = bid * 32 + tidx;
                 if(neuron < NUM_NEURONS)
                 {
                     num_den[tidx] = num_dendrite[neuron];
@@ -220,7 +218,7 @@ class BaseNeuron(object):
                 }
             } else if(tidy == 1)
             {
-                neuron = bid * N + tidx;
+                neuron = bid * 32 + tidx;
                 if(neuron < NUM_NEURONS)
                 {
                     den_start[tidx] = cum_num_dendrite[neuron];
@@ -231,14 +229,14 @@ class BaseNeuron(object):
 
             __syncthreads();
 
-            neuron = bid * N + tidy ;
+            neuron = bid * 32 + tidy ;
             if(neuron < NUM_NEURONS)
             {
                int n_den = num_den[tidy];
                int start = den_start[tidy];
                double VV = V_in[tidy];
 
-               for(int i = tidx; i < n_den; i += N)
+               for(int i = tidx; i < n_den; i += 32)
                {
                    input[tidy][tidx] += synapse[pre[start + i]] * (VV - V_rev[start + i]);
                }
@@ -272,7 +270,7 @@ class BaseNeuron(object):
             if(tidy == 0)
             {
                 input[tidx][0] += input[tidx][1];
-                neuron = bid*N+tidx;
+                neuron = bid*32+tidx;
                 if(neuron < NUM_NEURONS)
                 {
                     I_pre[neuron] -= input[tidx][0];
@@ -286,35 +284,40 @@ class BaseNeuron(object):
         func = mod.get_function("get_input")
         func.prepare([np.intp, np.intp, np.intp, np.intp,
                       np.intp, np.intp, np.intp])
+        self.__block_get_input_g = (32, 32, 1)
+        self.__grid_get_input_g = ((num_neurons - 1) / 32 + 1, 1)
         return func
 
     def get_update_from_I_func(self, num_neurons):
         template = """
-        #define N 32
         #define NUM_NEURONS %(num_neurons)d
 
         __global__ void get_input(double* synapse, int* cum_num_dendrite,
                                   int* num_dendrite, int* pre, double* I_pre)
         {
-            // assumes block size is N, N, 1
+            // must use block size 32, 32, 1
             int tidx = threadIdx.x;
             int tidy = threadIdx.y;
             int bid = blockIdx.x;
 
             int neuron;
 
-            __shared__ int num_den[N];
-            __shared__ int den_start[N];
-            __shared__ double input[N][N+1];
+            __shared__ int num_den[32];
+            __shared__ int den_start[32];
+            __shared__ double input[32][33];
 
-            neuron = bid * N + tidx;
+            neuron = bid * 32 + tidx;
 
-            // tidy, tidx are interchangeable here
             if(tidy == 0)
             {
                 if(neuron < NUM_NEURONS)
                 {
                     num_den[tidx] = num_dendrite[neuron];
+                }
+            }else if(tidy == 1)
+            {
+                if(neuron < NUM_NEURONS)
+                {
                     den_start[tidx] = cum_num_dendrite[neuron];
                 }
             }
@@ -322,15 +325,17 @@ class BaseNeuron(object):
             input[tidx][tidy] = 0.0;
 
             __syncthreads();
+            
+            neuron = bid * 32 + tidy;
 
             if(neuron < NUM_NEURONS){
 
-               int n_den = num_den[tidx];
-               int start = den_start[tidx];
+               int n_den = num_den[tidy];
+               int start = den_start[tidy];
 
-               for(int i = tidy; i < n_den; i += N)
+               for(int i = tidx; i < n_den; i += 32)
                {
-                   input[tidx][tidy] += synapse[pre[start] + i];
+                   input[tidy][tidx] += synapse[pre[start] + i];
                }
             }
             __syncthreads();
@@ -361,7 +366,7 @@ class BaseNeuron(object):
             if(tidy == 0)
             {
                 input[tidx][0] += input[tidx][1];
-                neuron = bid*N+tidx;
+                neuron = bid*32+tidx;
                 if(neuron < NUM_NEURONS)
                 {
                     I_pre[neuron] += input[tidx][0];
@@ -375,4 +380,6 @@ class BaseNeuron(object):
                            options = ["--ptxas-options=-v"])
         func = mod.get_function("get_input")
         func.prepare([np.intp, np.intp, np.intp, np.intp, np.intp])
+        self.__block_get_input_I = (32, 32, 1)
+        self.__grid_get_input_I = ((num_neurons - 1) / 32 + 1, 1)
         return func
