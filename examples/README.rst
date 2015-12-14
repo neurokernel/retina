@@ -21,8 +21,12 @@ User can edit this file or use a different one but in the latter case should
 provide the name to the script.
 
 Try
-$ ./run_<example>_demo.sh -h
+
+    $ ./run_<example>_demo.sh -h
+
 or
-$ python <example>_demo.py -h
+
+    $ python <example>_demo.py -h
+
 for all the available options
 
