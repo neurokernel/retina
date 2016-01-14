@@ -74,7 +74,7 @@ def gen_input(config):
                                (screen.grid[1], screen_dimb_file),
                                (rfs.refa, retina_dima_file),
                                (rfs.refb, retina_dimb_file)]:
-            sio.write_memory_to_file(data, filename)
+            sio.write_array(data, filename)
 
 def _get_receptive_fields(retina, screen, screen_type):
     mapdr_cls = cls_map.get_mapdr_cls(screen_type)
