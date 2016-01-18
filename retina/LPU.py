@@ -75,19 +75,14 @@ class LPU(Module):
     """
 
     @staticmethod
-    def lpu_parser(filename):
+    def graph_to_dicts(graph):
         """
-        GEXF LPU specification parser.
-
-        Extract LPU specification data from a GEXF file and store it
-        in a list of dictionaries. All nodes in the GEXF file are assumed to
-        correspond to neuron model instances while all edges are assumed to
-        correspond to synapse model instances.
+        Convert graph of LPU neuron/synapse data to Python data structures.
 
         Parameters
         ----------
-        filename : str
-            GEXF filename.
+        graph : networkx.MultiDiGraph
+            NetworkX graph containing LPU data.
 
         Returns
         -------
@@ -136,9 +131,6 @@ class LPU(Module):
         ----
         Input data should be validated.
         """
-
-        # parse the GEXF file using networkX
-        graph = nx.read_gexf(filename)
 
         # parse neuron data
         neurons = graph.node.items()
@@ -195,14 +187,21 @@ class LPU(Module):
         for syn in synapses:
             # syn[0/1]: pre-/post-neu id; syn[2]: dict of synaptic data
             model = syn[2]['model']
-            syn[2]['id'] = int( syn[2]['id'] )
-            # if the synapse model does not appear before, add it into s_dict
+
+            # Assign the synapse edge an ID if none exists (e.g., because the
+            # graph was never stored/read to/from GEXF):
+            if syn[2].has_key('id'):
+                syn[2]['id'] = int(syn[2]['id'])
+            else:
+                syn[2]['id'] = id
+
+            # if the synapse model does not appear before, add it into s_dict:
             if model not in s_dict:
                 s_dict[model] = {k: [] for k in syn[2].keys() + ['pre', 'post']}
 
-            # synapses of the same model should have the same attributes
+            # Synapses of the same model should have the same attributes:
             assert(set(s_dict[model].keys()) == set(syn[2].keys() + ['pre', 'post']))
-            # add synaptic data into the subdictionary of s_dict
+            # Add synaptic data into the subdictionary of s_dict:
             for key in syn[2].iterkeys():
                 s_dict[model][key].append(syn[2][key])
             s_dict[model]['pre'].append(syn[0])
@@ -212,6 +211,36 @@ class LPU(Module):
         if not s_dict:
             s_dict = {}
         return n_dict, s_dict
+
+    @staticmethod
+    def lpu_parser(filename):
+        """
+        GEXF LPU specification parser.
+
+        Extract LPU specification data from a GEXF file and store it in
+        Python data structures. All nodes in the GEXF file are assumed to
+        correspond to neuron model instances while all edges are assumed to
+        correspond to synapse model instances.
+
+        Parameters
+        ----------
+        filename : str
+            GEXF filename.
+
+        Returns
+        -------
+        n_dict : dict of dict of list
+            Each key of `n_dict` is the name of a neuron model; the values
+            are dicts that map each attribute name to a list that contains the
+            attribute values for each neuron class.
+        s_dict : dict of dict of list
+            Each key of `s_dict` is the name of a synapse model; the values are
+            dicts that map each attribute name to a list that contains the
+            attribute values for each each neuron.        
+        """
+
+        graph = nx.read_gexf(filename)
+        return LPU.graph_to_dicts(graph)
 
     @classmethod
     def extract_in_gpot(cls, n_dict):
