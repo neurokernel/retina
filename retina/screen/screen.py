@@ -4,12 +4,13 @@ import os
 from abc import ABCMeta, abstractmethod, abstractproperty
 
 import numpy as np
-import tables
+from neurokernel.LPU.utils.simpleio import *
 
 from retina.input.image2d import image2Dfactory
 
 from map.mapimpl import pointmapfactory
 from transform.imagetransform import ImageTransform
+
 
 
 class Screen(object):
@@ -67,18 +68,18 @@ class Screen(object):
     def setup_file(self, filename, read=False):
         """ tell self to use filename instead of generating video """
         if read:
-            self.inputfile = tables.openFile(filename, 'r')
-            self.inputarray = self.inputfile.root.array
+            self.inputfile = h5py.File(filename, 'r')
+            self.inputarray = self.inputfile['/array']
             self.store_to_file = False
             self.read_from_file = True
+            self.file_position = 0
         else:
-            self.outputfile = tables.openFile(filename, 'w')
-            self.outputfile.createEArray(
-                "/", "array",
-                tables.Float64Atom() if self._dtype == np.double
-                else tables.Float32Atom(),
-                (0, self._height, self._width),
-                filters=tables.Filters(complevel=9, complib='zlib'))
+            self.outputfile = h5py.File(filename, 'w')
+            self.outputfile.create_dataset(
+                '/array', (0, self._height, self._width),
+                dtype = self._dtype,
+                maxshape=(None, self._height, self._width),
+                compression = 9)
             self.store_to_file = True
             self.read_from_file = False
 
@@ -86,7 +87,8 @@ class Screen(object):
         """ generate or read the next num_steps of inputs """
         try:
             if self.read_from_file:
-                screens = self.inputarray.read(num_steps)
+                screens = self.inputarray[self.file_position:self.file_position+num_steps]
+                self.file_position += num_steps
             else:
                 # values on 2D
                 images = self._image2d.generate_2dimage(num_steps)
@@ -98,8 +100,7 @@ class Screen(object):
                 # XXX relies on num_steps
                 # if num_steps is 1 all inputs are stored
                 # not every 10 of them
-                self.outputfile.root.array.append(screens[::10])
-                self.outputfile.flush()
+                dataset_append(self.outputfile['/array'], screens[::10])
 
         except AttributeError:
             print('Function for file setup probably not called')

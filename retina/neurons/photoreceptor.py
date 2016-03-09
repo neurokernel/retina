@@ -3,9 +3,9 @@ import pycuda.driver as cuda
 import pycuda.gpuarray as garray
 from pycuda.compiler import SourceModule
 from pycuda.tools import dtype_to_ctype, context_dependent_memoize
-import tables
 
 import neurokernel.LPU.utils.curand as curand
+from neurokernel.LPU.utils.simpleio import *
 
 from baseneuron import BaseNeuron
 
@@ -13,7 +13,7 @@ from baseneuron import BaseNeuron
 class Photoreceptor(BaseNeuron):
     dtype = np.double
 
-    def __init__(self, n_dict, V_p, input_dt, debug, LPU_id):
+    def __init__(self, n_dict, V_p, input_dt, debug, LPU_id, cuda_verbose):
 
         self.num_neurons = len(n_dict['id'])  # NOT n_dict['num_neurons']
 
@@ -43,8 +43,9 @@ class Photoreceptor(BaseNeuron):
         self._initialize(n_dict)
 
     @classmethod
-    def initneuron(cls, n_dict, neuronstate_p, dt, debug=False, LPU_id=None):
-        return cls(n_dict, neuronstate_p, dt, debug, LPU_id)
+    def initneuron(cls, n_dict, neuronstate_p, dt, debug=False, LPU_id=None,
+                   cuda_verbose = False):
+        return cls(n_dict, neuronstate_p, dt, debug, LPU_id, cuda_verbose)
 
     def _initialize(self, n_dict):
         self._setup_output()
@@ -56,11 +57,10 @@ class Photoreceptor(BaseNeuron):
     def _setup_output(self):
         outputfile = self.LPU_id + '_out'
         if self.record_neuron:
-            self.outputfile_I = tables.openFile(outputfile+'I.h5', 'w')
-            self.outputfile_I.createEArray(
-                "/", "array",
-                tables.Float64Atom() if self.dtype == np.double else tables.Float32Atom(),
-                (0, self.num_neurons))
+            self.outputfile_I = h5py.File(outputfile+'I.h5', 'w')
+            self.outputfile_I.create_dataset(
+                '/array', (0, self.num_neurons), dtype = self.dtype,
+                maxshape = (None, self.num_neurons))
 
     def _setup_poisson(self, seed=0):
         self.randState = curand.curand_setup(
@@ -100,10 +100,10 @@ class Photoreceptor(BaseNeuron):
             self.dtype, self.block_transduction[0],
             self.num_microvilli, Xaddress,
             change_ind1, change_ind2,
-            change1, change2)
+            change1, change2, self.compile_options)
 
         self.ns = garray.zeros(self.num_neurons, self.dtype) + 1
-        self.update_ns_func = get_update_ns_func(self.dtype)
+        self.update_ns_func = get_update_ns_func(self.dtype, self.compile_options)
 
     def _setup_hh(self):
         self.I = garray.zeros((1, self.num_neurons), self.dtype)
@@ -122,8 +122,9 @@ class Photoreceptor(BaseNeuron):
         self.hhx[4].fill(0.0017)
 
         self.sum_current_func = get_sum_current_func(self.dtype,
-                                                     self.block_transduction[0])
-        self.hh_func = get_hh_func(self.dtype)
+                                                     self.block_transduction[0],
+                                                     self.compile_options)
+        self.hh_func = get_hh_func(self.dtype, self.compile_options)
 
     def _setup_update_state(self, n_dict):
         self.I_fb = garray.zeros(self.num_neurons, self.dtype)
@@ -146,14 +147,14 @@ class Photoreceptor(BaseNeuron):
 
         self.num_dendrite_g = garray.to_gpu(num_dendrite_g)
         self.num_dendrite_p = garray.to_gpu(num_dendrite_p)
-        if len(n_dict['g_pre']):
-            self.g_pre = garray.to_gpu(np.asarray(n_dict['g_pre'], dtype=np.int32))
-            self.V_rev = garray.to_gpu(np.asarray(n_dict['V_rev'], dtype=np.double))
+        if len(n_dict['cond_pre']):
+            self.g_pre = garray.to_gpu(np.asarray(n_dict['cond_pre'], dtype=np.int32))
+            self.V_rev = garray.to_gpu(np.asarray(n_dict['reverse'], dtype=np.double))
             self.fb = True
         else:
             self.fb = False
 
-        if len(n_dict['I_pre']):
+        if len(n_dict['pre']):
             self.p_pre = garray.to_gpu(np.asarray(n_dict['I_pre'], dtype=np.int32))
             self.get_in = True
         else:
@@ -168,9 +169,7 @@ class Photoreceptor(BaseNeuron):
 
     def _write_outputfile(self):
         if self.record_neuron:
-            self.outputfile_I.root.array.append(self.I.get())
-            self.outputfile_I.flush()
-
+            dataset_append(self.outputfile_I['/array'], self.I.get())
 
     def eval(self, st=None):
         for _ in range(self.multiple):
@@ -226,7 +225,7 @@ class Photoreceptor(BaseNeuron):
 # end of photoreceptor
 
 
-def get_update_ns_func(dtype):
+def get_update_ns_func(dtype, compile_options):
     template = """
 
 #define RTAU 1.0
@@ -254,14 +253,14 @@ update_ns(%(type)s* g_ns, int num_neurons, %(type)s* V, %(type)s dt)
     scalartype = dtype.type if isinstance(dtype, np.dtype) else dtype
     mod = SourceModule(template % {"type": dtype_to_ctype(dtype),
                                    "fletter": 'f' if scalartype == np.float32 else ''},
-                       options = ["--ptxas-options=-v"])
+                       options = compile_options)
     func = mod.get_function('update_ns')
-    func.prepare([np.intp, np.int32, np.intp, scalartype])
+    func.prepare('PiP'+np.dtype(dtype).char)#[np.intp, np.int32, np.intp, scalartype])
     return func
 
 
 def get_transduction_func(dtype, block_size, num_microvilli, Xaddress,
-                          change_ind1, change_ind2, change1, change2):
+                          change_ind1, change_ind2, change1, change2, compile_options):
     template = """
 /* This is kept for documentation purposes the actual code used is after the end
  * of this template */
@@ -845,7 +844,7 @@ transduction(curandStateXORWOW_t *state,
             "num_microvilli": num_microvilli,
             "fletter": 'f' if scalartype == np.float32 else ''
         },
-        options = ["--ptxas-options=-v --maxrregcount=56"],
+        options = compile_option,#["--ptxas-options=-v --maxrregcount=56"],
         no_extern_c = True)
     func = mod.get_function('transduction')
     d_X_address, d_X_nbytes = mod.get_global("d_X")
@@ -859,12 +858,12 @@ transduction(curandStateXORWOW_t *state,
     cuda.memcpy_htod(d_change1_address, change1)
     cuda.memcpy_htod(d_change2_address, change2)
 
-    func.prepare([np.intp, np.float32, np.intp, np.intp, np.intp])
+    func.prepare('PfPPP')#[np.intp, np.float32, np.intp, np.intp, np.intp])
     func.set_cache_config(cuda.func_cache.PREFER_SHARED)
     return func
 
 
-def get_hh_func(dtype):
+def get_hh_func(dtype, compile_options):
     template = """
 #define E_K (-85)
 #define E_Cl (-30)
@@ -943,14 +942,15 @@ hh(%(type)s* I_all, %(type)s* d_V, %(type)s* d_sa, %(type)s* d_si,
     scalartype = dtype.type if isinstance(dtype, np.dtype) else dtype
     mod = SourceModule(template % {"type": dtype_to_ctype(dtype), "fletter": 'f'
                                    if scalartype == np.float32 else ''},
-                       options = ["--ptxas-options=-v"])
+                       options = compile_options)
     func = mod.get_function('hh')
-    func.prepare([np.intp, np.intp, np.intp, np.intp, np.intp, np.intp, np.intp,
-                  np.int32, scalartype, np.int32])
+    func.prepare('PPPPPPPi'+np.dtype(dtype).char+'i')
+    #[np.intp, np.intp, np.intp, np.intp, np.intp, np.intp, np.intp,
+    #              np.int32, scalartype, np.int32])
     return func
 
 
-def get_sum_current_func(dtype, block_size):
+def get_sum_current_func(dtype, block_size, compile_options):
     template = """
 #define BLOCK_SIZE %(block_size)d
 #define G_TRP           8       /* conductance of a TRP channel */
@@ -1005,8 +1005,8 @@ sum_current(short2* d_Tstar, int num_microvilli, %(type)s* d_Vm,
     # float: Used 20 registers, 1024 bytes smem, 352 bytes cmem[0], 24 bytes cmem[2]
     mod = SourceModule(template % {"type": dtype_to_ctype(dtype),
                                    "block_size": block_size},
-                       options = ["--ptxas-options=-v"])
+                       options = compile_options)
     func = mod.get_function('sum_current')
-    func.prepare([np.intp, np.int32, np.intp, np.intp, np.intp])
+    func.prepare('PiPPP')#[np.intp, np.int32, np.intp, np.intp, np.intp])
     return func
 

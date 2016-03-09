@@ -9,7 +9,8 @@ from pycuda.tools import dtype_to_ctype, context_dependent_memoize
 from baseneuron import BaseNeuron
 
 class BufferNeuron(BaseNeuron):
-    def __init__(self, n_dict, neuronstate_p, dt, debug=False, LPU_id='buffer'):
+    def __init__(self, n_dict, neuronstate_p, dt, debug=False, LPU_id='buffer',
+                 cuda_verbose = False):
         self.num_neurons = len(n_dict['id'])
         self.neuronstate_p = neuronstate_p
         self.debug = debug
@@ -57,10 +58,10 @@ class BufferNeuron(BaseNeuron):
 
         mod = SourceModule(src % {"type": dtype_to_ctype(dtype),
                                   "block_size": self.copy_block[0]},
-                           options = ["--ptxas-options=-v"])
+                           options = self.compile_options)
 
         func = mod.get_function("copy_state")
-        func.prepare([np.intp, np.intp, np.int32])
+        func.prepare('PPi')
 
         return func
 

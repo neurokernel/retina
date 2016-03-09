@@ -4,6 +4,7 @@
 Base neuron class used by LPU.
 """
 
+import warnings
 from abc import ABCMeta, abstractmethod
 import os.path
 import numpy as np
@@ -16,38 +17,56 @@ from neurokernel.LPU.utils.simpleio import *
 class BaseNeuron(object):
     __metaclass__ = ABCMeta
 
-    def __init__(self, n_dict, neuron_state_p, debug=False, LPU_id=None):
+    def __init__(self, n_dict, neuron_state_pointer, debug=False, LPU_id=None,
+                 cuda_verbose = False):
         '''
         See initmethod for documentation of arguments
         '''
-        self.__neuron_state_p = neuron_state_p
-        num_neurons = len(n_dict['id'])
-
-        num_dendrite_I = np.asarray([n_dict['num_dendrites_I'][i]
-                                     for i in range(num_neurons)],
-                                    dtype=np.int32).flatten()
-        num_dendrite_g = np.asarray([n_dict['num_dendrites_g'][i]
-                                     for i in range(num_neurons)],
-                                    dtype=np.int32).flatten()
-
-        self.__cum_num_dendrite_I = garray.to_gpu(np.concatenate((
-                                np.asarray([0, ], dtype=np.int32),
-                                np.cumsum(num_dendrite_I, dtype=np.int32))))
-        self.__cum_num_dendrite_g = garray.to_gpu(np.concatenate((
-                                np.asarray([0, ], dtype=np.int32),
-                                np.cumsum(num_dendrite_g, dtype=np.int32))))
-        self.__num_dendrite_I = garray.to_gpu(num_dendrite_I)
-        self.__num_dendrite_g = garray.to_gpu(num_dendrite_g)
-        self.__I_pre = garray.to_gpu(np.asarray(n_dict['I_pre'], dtype=np.int32))
-        self.__g_pre = garray.to_gpu(np.asarray(n_dict['g_pre'], dtype=np.int32))
-
-        self.__V_rev = garray.to_gpu(np.asarray(n_dict['V_rev'],
-                                                dtype=np.double))
-
-        self.__update_from_I = self.get_update_from_I_func(num_neurons)
-        self.__update_from_g = self.get_update_from_g_func(num_neurons)
-
+        if cuda_verbose:
+            self.compile_options = ['--ptxas-options=-v']
+        else:
+            self.compile_options = []
+        
         self.__LPU_id = LPU_id
+        
+        self.__neuron_state_pointer = neuron_state_pointer
+        self.__num_neurons = len(n_dict['id'])
+        
+        _num_dendrite_cond = np.asarray([n_dict['num_dendrites_cond'][i]
+                                         for i in range(self.__num_neurons)],
+                                        dtype=np.int32).flatten()
+        _num_dendrite = np.asarray([n_dict['num_dendrites_I'][i]
+                                    for i in range(self.__num_neurons)],
+                                   dtype=np.int32).flatten()
+
+        self.__cum_num_dendrite = garray.to_gpu(np.concatenate((
+                                np.asarray([0,], dtype=np.int32),
+                                np.cumsum(_num_dendrite, dtype=np.int32))))
+        self.__cum_num_dendrite_cond = garray.to_gpu(np.concatenate((
+                                np.asarray([0,], dtype=np.int32),
+                                np.cumsum(_num_dendrite_cond, dtype=np.int32))))
+        self.__num_dendrite = garray.to_gpu(_num_dendrite)
+        self.__num_dendrite_cond = garray.to_gpu(_num_dendrite_cond)
+        self.__pre = garray.to_gpu(np.asarray(n_dict['I_pre'], dtype=np.int32))
+        self.__cond_pre = garray.to_gpu(np.asarray(n_dict['cond_pre'],
+                                                  dtype=np.int32))
+        self.__V_rev = garray.to_gpu(np.asarray(n_dict['reverse'],
+                                                dtype=np.double))
+        try:
+            assert(isinstance(getattr(self, 'I'), garray.GPUArray))
+        except AttributeError, AssertionError:
+            self.I = garray.zeros(self.__num_neurons, np.double)
+        
+        if self.I.size != self.__num_neurons:
+            self.I = garray.zeros(self.__num_neurons, np.double)
+            warnings.warn('GPUArray representing current in ' +
+                          '{}'.format(type(self).__name__) + ' neuron of ' +
+                          '{}'.format(self.__LPU_id) + ' LPU has been changed ' +
+                          ' due to incompatible size.')
+        
+        self.__update_I_cond = self.__get_update_I_cond_func()
+        self.__update_I_non_cond = self.__get_update_I_non_cond_func()
+
         self.__debug = debug
         self.__debug_setup()
 
@@ -61,15 +80,17 @@ class BaseNeuron(object):
                 newfile = "{}_{}{}.h5".format(self.__LPU_id,
                                                  self.__class__.__name__, i)
                 if not os.path.isfile(newfile):
-                    self.__in_file = tables.openFile(newfile, mode="w")
-                    self.__in_file.createEArray("/", "array",
-                                                tables.Float64Atom(),
-                                                (0, self.num_neurons))
+                    self.__I_file = h5py.File(newfile, "w")
+                    self.__I_file.create_dataset('/array',
+                                         (0, self.num_neurons),
+                                         dtype=np.float64,
+                                         maxshape=(None, self.num_neurons))
                     break
                 i += 1
 
     @abstractmethod
-    def initneuron(cls, n_dict, neuron_state_p, dt, debug=False, LPU_id=None):
+    def initneuron(cls, n_dict, neuron_state_p, dt, debug=False, LPU_id=None,
+                   cuda_verbose = False):
         '''
         This method is a wrapper of __init__ method but it is defined
         to enforce a specific constructor interface e.g. constructor
@@ -121,7 +142,7 @@ class BaseNeuron(object):
         LPU_id: an identifier of LPU that will appear in logs so it should be unique
         for LPUs of a specific simulation
         '''
-        cls(n_dict, neuron_state_p, debug, LPU_id)
+        cls(n_dict, neuron_state_p, debug, LPU_id, cuda_verbose)
 
     @abstractmethod
     def eval(self):
@@ -137,7 +158,7 @@ class BaseNeuron(object):
         pass
 
     @abstractmethod
-    def update_internal_state(self, synapse_state_p, st=None, logger=None):
+    def update_internal_state(self, synapse_state_pointer, st=None, logger=None):
         '''
         This method should compute the internal state of each neuron
         based on the synapse state.
@@ -155,30 +176,29 @@ class BaseNeuron(object):
         '''
         pass
 
-    def update_internal_state_default(self, synapse_state_p, internal_state,
+    def update_internal_state_default(self, synapse_state_pointer, internal_state,
             st=None, logger=None):
 
         internal_state.fill(0)
-        if self.__I_pre.size > 0:
+        if self.__pre.size > 0:
             # synapse_state(I) -> internal_state(I)
-            self.__update_from_I.prepared_async_call(
+            self.__update_I_non_cond.prepared_async_call(
                 self.__grid_get_input_I, self.__block_get_input_I, st,
-                int(synapse_state_p), self.__cum_num_dendrite_I.gpudata,
-                self.__num_dendrite_I.gpudata, self.__I_pre.gpudata,
+                int(synapse_state_pointer), self.__cum_num_dendrite.gpudata,
+                self.__num_dendrite.gpudata, self.__pre.gpudata,
                 internal_state.gpudata)
 
-        if self.__g_pre.size > 0:
+        if self.__cond_pre.size > 0:
             # synapse_state(g) -> internal_state(I)
-            self.__update_from_g.prepared_async_call(
-                self.__grid_get_input_g, self.__block_get_input_g, st,
-                int(synapse_state_p), self.__cum_num_dendrite_g.gpudata,
-                self.__num_dendrite_g.gpudata, self.__g_pre.gpudata,
-                internal_state.gpudata, int(self.__neuron_state_p),
+            self.__update_I_cond.prepared_async_call(
+                self.__grid_get_input_cond, self.__block_get_input_cond, st,
+                int(synapse_state_pointer), self.__cum_num_dendrite_cond.gpudata,
+                self.__num_dendrite_cond.gpudata, self.__cond_pre.gpudata,
+                internal_state.gpudata, int(self.__neuron_state_pointer),
                 self.__V_rev.gpudata)
 
         if self.__debug:
-            self.__in_file.root.array.append(internal_state.get()
-                                             .reshape((1, -1)))
+            dataset_append(self.__I_file['/array'], internal_state.get().reshape((1, -1)))
 
     @abstractmethod
     def post_run(self):
@@ -186,9 +206,9 @@ class BaseNeuron(object):
         This method will be called at the end of the simulation.
         '''
         if self.__debug:
-            self.__in_file.close()
+            self.__I_file.close()
 
-    def get_update_from_g_func(self, num_neurons):
+    def __get_update_I_cond_func(self):
         template = """
         #define NUM_NEURONS %(num_neurons)d
 
@@ -196,7 +216,7 @@ class BaseNeuron(object):
                                   int* num_dendrite, int* pre, double* I_pre,
                                   double* V, double* V_rev)
         {
-            // must use block size 32, 32, 1
+            // must use block size (32, 32, 1)
             int tidx = threadIdx.x;
             int tidy = threadIdx.y;
             int bid = blockIdx.x;
@@ -279,23 +299,22 @@ class BaseNeuron(object):
         }
         // can be improved
         """
-        mod = SourceModule(template % {"num_neurons": num_neurons},
-                           options = ["--ptxas-options=-v"])
+        mod = SourceModule(template % {"num_neurons": self.__num_neurons},
+                           options = self.compile_options)
         func = mod.get_function("get_input")
-        func.prepare([np.intp, np.intp, np.intp, np.intp,
-                      np.intp, np.intp, np.intp])
-        self.__block_get_input_g = (32, 32, 1)
-        self.__grid_get_input_g = ((num_neurons - 1) / 32 + 1, 1)
+        func.prepare(['PPPPPPP'])
+        self.__block_get_input_cond = (32, 32, 1)
+        self.__grid_get_input_cond = ((self.__num_neurons - 1) / 32 + 1, 1)
         return func
 
-    def get_update_from_I_func(self, num_neurons):
+    def __get_update_I_non_cond_func(self):
         template = """
         #define NUM_NEURONS %(num_neurons)d
 
         __global__ void get_input(double* synapse, int* cum_num_dendrite,
                                   int* num_dendrite, int* pre, double* I_pre)
         {
-            // must use block size 32, 32, 1
+            // must use block size (32, 32, 1)
             int tidx = threadIdx.x;
             int tidy = threadIdx.y;
             int bid = blockIdx.x;
@@ -306,16 +325,16 @@ class BaseNeuron(object):
             __shared__ int den_start[32];
             __shared__ double input[32][33];
 
-            neuron = bid * 32 + tidx;
-
             if(tidy == 0)
             {
+                neuron = bid * 32 + tidx;
                 if(neuron < NUM_NEURONS)
                 {
                     num_den[tidx] = num_dendrite[neuron];
                 }
             }else if(tidy == 1)
             {
+                neuron = bid * 32 + tidx;
                 if(neuron < NUM_NEURONS)
                 {
                     den_start[tidx] = cum_num_dendrite[neuron];
@@ -376,10 +395,10 @@ class BaseNeuron(object):
         }
         //can be improved
         """
-        mod = SourceModule(template % {"num_neurons": num_neurons},
-                           options = ["--ptxas-options=-v"])
+        mod = SourceModule(template % {"num_neurons": self.__num_neurons},
+                           options = self.compile_options)
         func = mod.get_function("get_input")
-        func.prepare([np.intp, np.intp, np.intp, np.intp, np.intp])
+        func.prepare('PPPPP')
         self.__block_get_input_I = (32, 32, 1)
-        self.__grid_get_input_I = ((num_neurons - 1) / 32 + 1, 1)
+        self.__grid_get_input_I = ((self.__num_neurons - 1) / 32 + 1, 1)
         return func

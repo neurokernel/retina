@@ -4,7 +4,7 @@ import os
 from abc import ABCMeta, abstractmethod
 
 import numpy as np
-import tables
+from neurokernel.LPU.utils.simpleio import *
 
 
 class Image2D(object):
@@ -31,15 +31,7 @@ class Image2D(object):
 
         if self.writefile:
             # for multiple calls file opening and closing has to be split
-            infile = tables.openFile(self.infilename, 'w')
-            infile.createEArray(
-                "/", "array", tables.Float64Atom(),
-                (0,) + self.shape,
-                filters=tables.Filters(complevel=9, complib='zlib'))
-
-            infile.root.array.append(im_v)
-            infile.flush()
-            infile.close()
+            write_array(im_v, self.infilename, complevel=9)
 
         return im_v
 
@@ -289,15 +281,7 @@ class Natural(Image2D):
 
         if self.writefile:
             # for multiple calls file opening and closing has to be split
-            infile = tables.openFile(self.infilename, 'w')
-            infile.createEArray(
-                "/", "array", tables.Float64Atom(),
-                (0,) + self.shape,
-                filters=tables.Filters(complevel=9, complib='zlib'))
-
-            infile.root.array.append(im_v)
-            infile.flush()
-            infile.close()
+            write_array(im_v, self.infilename, complevel=9)
 
         return im_v
 
