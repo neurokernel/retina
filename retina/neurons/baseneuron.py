@@ -64,8 +64,8 @@ class BaseNeuron(object):
                           '{}'.format(self.__LPU_id) + ' LPU has been changed ' +
                           ' due to incompatible size.')
         
-        self.__update_I_cond = self.__get_update_I_cond_func()
-        self.__update_I_non_cond = self.__get_update_I_non_cond_func()
+        self.__update_I_cond = self.get_update_I_cond_func()
+        self.__update_I_non_cond = self.get_update_I_non_cond_func()
 
         self.__debug = debug
         self.__debug_setup()
@@ -208,7 +208,7 @@ class BaseNeuron(object):
         if self.__debug:
             self.__I_file.close()
 
-    def __get_update_I_cond_func(self):
+    def get_update_I_cond_func(self):
         template = """
         #define NUM_NEURONS %(num_neurons)d
 
@@ -307,7 +307,7 @@ class BaseNeuron(object):
         self.__grid_get_input_cond = ((self.__num_neurons - 1) / 32 + 1, 1)
         return func
 
-    def __get_update_I_non_cond_func(self):
+    def get_update_I_non_cond_func(self):
         template = """
         #define NUM_NEURONS %(num_neurons)d
 

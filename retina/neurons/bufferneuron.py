@@ -16,11 +16,11 @@ class BufferNeuron(BaseNeuron):
         self.debug = debug
         self.LPU_id = LPU_id
 
-        self.copy_state = self.get_copy_state()
-
         self._I = garray.zeros(self.num_neurons, np.double)
 
-        super(BufferNeuron, self).__init__(n_dict, neuronstate_p, debug)
+        super(BufferNeuron, self).__init__(n_dict, neuronstate_p, debug,
+                                           LPU_id, cuda_verbose)
+        self.copy_state = self.get_copy_state()
 
     @classmethod
     def initneuron(cls, n_dict, neuronstate_p, dt, debug=False, LPU_id=None):

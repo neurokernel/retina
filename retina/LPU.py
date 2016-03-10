@@ -480,7 +480,7 @@ class LPU(Module):
 
             if s['conductance'][0]:
                 g_post.extend(s['post'])
-                V_rev.extend(s['V_rev'])
+                V_rev.extend(s['reverse'])
                 g_pre.extend(range(count, count+len(s['post'])))
                 count += len(s['post'])
                 if 'delay' in s:
@@ -535,8 +535,8 @@ class LPU(Module):
                     (cond_post >= self.idx_start_spike[i] + spike_shift)&
                     (cond_post < self.idx_start_spike[i+1] + spike_shift) )
                 n['g_post'] = g_post[idx] - self.idx_start_spike[i] - spike_shift
-                n['g_pre'] = g_pre[idx]
-                n['V_rev'] = V_rev[idx]
+                n['cond_pre'] = g_pre[idx]
+                n['reverse'] = V_rev[idx]
                 idx = np.where(
                     (I_post >= self.idx_start_spike[i] + spike_shift)&
                     (I_post < self.idx_start_spike[i+1] + spike_shift) )
@@ -546,14 +546,14 @@ class LPU(Module):
                 idx = np.where( (g_post >= self.idx_start_gpot[i])&
                                 (g_post < self.idx_start_gpot[i+1]) )
                 n['g_post'] = g_post[idx] - self.idx_start_gpot[i]
-                n['g_pre'] = g_pre[idx]
-                n['V_rev'] = V_rev[idx]
+                n['cond_pre'] = g_pre[idx]
+                n['reverse'] = V_rev[idx]
                 idx =  np.where( (I_post >= self.idx_start_gpot[i])&
                                  (I_post < self.idx_start_gpot[i+1]) )
                 n['I_post'] = I_post[idx] - self.idx_start_gpot[i]
                 n['I_pre'] = I_pre[idx]
 
-            n['num_dendrites_g'] = Counter(n['g_post'])
+            n['num_dendrites_cond'] = Counter(n['g_post'])
             n['num_dendrites_I'] = Counter(n['I_post'])
 
         self.gpot_delay_steps = int(round(gpot_delay_steps*1e-3/self.dt)) + 1
@@ -700,7 +700,8 @@ class LPU(Module):
                     maxshape=(None, self.total_num_spike_neurons))
 
         if self.debug:
-            self.gpot_buffer_file = h5py.File(self.id + '_buffer.h5', 'w')
+            if self.total_num_gpot_neurons > 0:
+                self.gpot_buffer_file = h5py.File(self.id + '_buffer.h5', 'w')
                 self.gpot_buffer_file.create_dataset(
                     '/array',
                     (0, self.gpot_delay_steps, self.total_num_gpot_neurons),

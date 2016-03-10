@@ -189,8 +189,9 @@ class Natural(Image2D):
         self.margin = 10
 
         if self.store_coords:
-            self.coordfile = tables.openFile(config['coord_file'], 'w')
-            self.coordfile.createEArray("/", "array", tables.Int32Atom(), (0, 2))
+            self.coordfile = h5py.File(config['coord_file'], 'w')
+            self.coordfile.create_dataset('/array', (0, 2), dtype=np.int32,
+                                          maxshape = (None, 2))
 
         self.reset()
 
@@ -276,8 +277,7 @@ class Natural(Image2D):
         self.vx = vx
         self.vy = vy
         if self.store_coords:
-            self.coordfile.root.array.append(xy)
-            self.coordfile.flush()
+            dataset_append(self.coordfile['/array'], xy)
 
         if self.writefile:
             # for multiple calls file opening and closing has to be split

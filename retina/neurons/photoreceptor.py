@@ -14,7 +14,7 @@ class Photoreceptor(BaseNeuron):
     dtype = np.double
 
     def __init__(self, n_dict, V_p, input_dt, debug, LPU_id, cuda_verbose):
-
+        
         self.num_neurons = len(n_dict['id'])  # NOT n_dict['num_neurons']
 
         # num_microvilli must be the same for every photoreceptor so the first
@@ -41,6 +41,9 @@ class Photoreceptor(BaseNeuron):
         self.grid_state = ((self.num_neurons-1)/self.block_state[0] + 1, 1)
 
         self._initialize(n_dict)
+        
+        super(Photoreceptor, self).__init__(n_dict, V_p, debug,
+                                            LPU_id, cuda_verbose)
 
     @classmethod
     def initneuron(cls, n_dict, neuronstate_p, dt, debug=False, LPU_id=None,
@@ -130,7 +133,7 @@ class Photoreceptor(BaseNeuron):
         self.I_fb = garray.zeros(self.num_neurons, self.dtype)
         self.photons = garray.zeros(self.num_neurons, self.dtype)
 
-        num_dendrite_g = np.asarray([n_dict['num_dendrites_g'][i]
+        num_dendrite_g = np.asarray([n_dict['num_dendrites_cond'][i]
                                      for i in range(self.num_neurons)],
                                     dtype=np.int32).flatten()
         # Anything associated with I is actually the input which is photons/s
@@ -154,14 +157,14 @@ class Photoreceptor(BaseNeuron):
         else:
             self.fb = False
 
-        if len(n_dict['pre']):
+        if len(n_dict['I_pre']):
             self.p_pre = garray.to_gpu(np.asarray(n_dict['I_pre'], dtype=np.int32))
             self.get_in = True
         else:
             self.get_in = False
 
-        self.update_I_fb = self.get_update_from_g_func(self.num_neurons)
-        self.update_photons = self.get_update_from_I_func(self.num_neurons)
+        self.update_I_fb = self.get_update_I_cond_func()
+        self.update_photons = self.get_update_I_non_cond_func()
 
     def post_run(self):
         if self.record_neuron:
@@ -844,7 +847,7 @@ transduction(curandStateXORWOW_t *state,
             "num_microvilli": num_microvilli,
             "fletter": 'f' if scalartype == np.float32 else ''
         },
-        options = compile_option,#["--ptxas-options=-v --maxrregcount=56"],
+        options = compile_options,#["--ptxas-options=-v --maxrregcount=56"],
         no_extern_c = True)
     func = mod.get_function('transduction')
     d_X_address, d_X_nbytes = mod.get_global("d_X")
