@@ -64,27 +64,36 @@ class Screen(object):
         xmin, ymin = imagx.min(), imagy.min()
         self._interpolator = ImageTransform(
             self._image2d.get_grid(xmin, xmax, ymin, ymax), [imagx, imagy])
+        self.screen_write_step = config['Retina']['screen_write_step']
 
     def setup_file(self, filename, read=False):
         """ tell self to use filename instead of generating video """
+        self.file_open = False
+        self.filename = filename
         if read:
-            self.inputfile = h5py.File(filename, 'r')
-            self.inputarray = self.inputfile['/array']
             self.store_to_file = False
             self.read_from_file = True
             self.file_position = 0
         else:
-            self.outputfile = h5py.File(filename, 'w')
-            self.outputfile.create_dataset(
-                '/array', (0, self._height, self._width),
-                dtype = self._dtype,
-                maxshape=(None, self._height, self._width),
-                compression = 9)
             self.store_to_file = True
             self.read_from_file = False
+            self.skip_step = self.screen_write_step
+            self.step_count = 1
 
     def get_screen_intensity_steps(self, num_steps):
         """ generate or read the next num_steps of inputs """
+        if not self.file_open:
+            if self.read_from_file:
+                self.inputfile = h5py.File(self.filename, 'r')
+                self.inputarray = self.inputfile['/array']
+            else:
+                self.outputfile = h5py.File(self.filename, 'w')
+                self.outputfile.create_dataset(
+                    '/array', (0, self._height, self._width),
+                    dtype = self._dtype,
+                    maxshape=(None, self._height, self._width),
+                    compression = 9)
+            self.file_open = True
         try:
             if self.read_from_file:
                 screens = self.inputarray[self.file_position:self.file_position+num_steps]
@@ -100,19 +109,24 @@ class Screen(object):
                 # XXX relies on num_steps
                 # if num_steps is 1 all inputs are stored
                 # not every 10 of them
-                dataset_append(self.outputfile['/array'], screens[::10])
+                if num_steps > self.skip_step:
+                    dataset_append(self.outputfile['/array'],
+                        screens[self.skip_step-self.step_count-1::self.skip_step])
+                    self.step_count += num_steps%self.skip_step
+                    if self.step_count >= self.skip_step:
+                        self.step_count -= self.skip_step
+                else:
+                    self.step_count += num_steps
+                    if self.step_count >= self.skip_step:
+                        dataset_append(self.outputfile['/array'],
+                            screens[[num_steps-(self.step_count-self.skip_step)-1]])
+                        self.step_count -= self.skip_step
 
         except AttributeError:
             print('Function for file setup probably not called')
             raise
 
         return screens
-
-    def get_screen_intensity_step(self):
-        # values on 2D
-        images = self._image2d.generate_2dimage(num_steps=1)
-        # values on screen
-        return self._interpolator.interpolate(images)
 
     @abstractmethod
     def get_image2d_dim(self):
