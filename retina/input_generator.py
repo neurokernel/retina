@@ -1,7 +1,9 @@
 
 import numpy as np
 
-import neurokernel.LPU.utils.simpleio as sio
+import h5py
+
+from neurokernel.LPU.utils.simpleio import *
 
 import classmapper as cls_map
 
@@ -19,6 +21,8 @@ class RetinaInputGenerator(object):
         self.retina = retina
 
         screen = self.screen
+        
+        screen.setup_file('intensities{}.h5'.format(i))
 
         retina_elev_file = 'retina_elev{}.h5'.format(i)
         retina_azim_file = 'retina_azim{}.h5'.format(i)
@@ -28,6 +32,8 @@ class RetinaInputGenerator(object):
 
         retina_dima_file = 'retina_dima{}.h5'.format(i)
         retina_dimb_file = 'retina_dimb{}.h5'.format(i)
+        
+        self.input_file = 'retina_input{}.h5'.format(i)
 
         elev_v, azim_v = retina.get_ommatidia_pos()
         rfs = self.generate_receptive_fields_no_gpu()
@@ -38,7 +44,9 @@ class RetinaInputGenerator(object):
                                (screen.grid[1], screen_dimb_file),
                                (rfs.refa, retina_dima_file),
                                (rfs.refb, retina_dimb_file)]:
-            sio.write_array(data, filename)
+            write_array(data, filename)
+    
+        self.file_open = False
 
     def generate_receptive_fields_no_gpu(self):
         #TODO intensities file should also be written but is omitted for
@@ -89,6 +97,22 @@ class RetinaInputGenerator(object):
         self.rfs = rfs
 
     def next_input(self):
-        im = self.screen.get_screen_intensity_step()
-        return self.rfs.filter_image(im)
+        if not self.file_open:
+            self.input_file_handle = h5py.File(self.input_file, 'w')
+            self.input_file_handle.create_dataset(
+                        '/array',
+                        (0, self.retina.num_photoreceptors),
+                        dtype=np.float64,
+                        maxshape=(None, self.retina.num_photoreceptors))
+            self.file_open = True
+        im = self.screen.get_screen_intensity_steps(1)
+        inputs = self.rfs.filter_image(im)
+        dataset_append(self.input_file_handle['/array'],
+                       inputs.get().reshape((1, -1)))
+        return inputs
 
+    def __del__(self):
+        try:
+            self.input_file_handle.close()
+        except:
+            pass
