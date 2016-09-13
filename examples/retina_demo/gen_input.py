@@ -2,6 +2,7 @@ from __future__ import division
 
 import argparse
 import atexit
+import os
 
 import numpy as np
 import pycuda.driver as cuda
@@ -21,7 +22,7 @@ def gen_input(config):
 
     suffix = config['General']['file_suffix']
 
-    eye_num = 1 # config['General']['eye_num']
+    eye_num = config['General']['eye_num']
 
     eulerangles = config['Retina']['eulerangles']
     radius = config['Retina']['radius']
@@ -29,12 +30,15 @@ def gen_input(config):
     rings = config['Retina']['rings']
     steps = config['General']['steps']
 
+    screen_write_step = config['Retina']['screen_write_step']
+    config['Retina']['screen_write_step'] = 1
     screen_type = config['Retina']['screentype']
     screen_cls = cls_map.get_screen_cls(screen_type)
 
     for i in range(eye_num):
         screen = screen_cls(config)
-        screen.setup_file('intensities{}{}.h5'.format(suffix,i))
+        screen_file = 'intensities_tmp{}.h5'.format(i)
+        screen.setup_file(screen_file)
     
         retina_elev_file = 'retina_elev{}.h5'.format(i)
         retina_azim_file = 'retina_azim{}.h5'.format(i)
@@ -67,6 +71,13 @@ def gen_input(config):
             sio.write_array(photor_inputs, filename=input_file, mode=write_mode)
             steps_count -= steps_batch
             write_mode = 'a'
+        
+        tmp = sio.read_array(screen_file)
+        sio.write_array(tmp[::screen_write_step],
+                        'intensities{}{}.h5'.format(suffix, i),
+                        complevel = 9)
+        del tmp
+        os.remove(screen_file)
 
         for data, filename in [(elev_v, retina_elev_file),
                                (azim_v, retina_azim_file),
