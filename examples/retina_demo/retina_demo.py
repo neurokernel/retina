@@ -121,18 +121,11 @@ def connect_master_worker(config, i, j, retina, manager):
     worker_id = get_worker_id(worker_dev)
     print('Connecting {} and {}'.format(master_id, worker_id))
 
-    master_selectors = retina.get_master_selectors()
-    worker_selectors = retina.get_worker_selectors(j+1, worker_num)
-
-    with Timer('creation of Pattern object'):
-        pattern = Pattern(','.join(master_selectors),
-                          ','.join(worker_selectors))
-
     with Timer('update of connections in Pattern object'):
-        retina.update_pattern_master_worker(j+1, worker_num, pattern)
+        pattern = retina.update_pattern_master_worker(j+1, worker_num)
 
     with Timer('update of connections in Manager'):
-        manager.connect(master_id, worker_id, pattern, compat_check=False)
+        manager.connect(master_id, worker_id, pattern)
 
 
 def start_simulation(config, manager):

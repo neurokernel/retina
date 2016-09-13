@@ -7,8 +7,9 @@ import networkx as nx
 import numpy as np
 PI = np.pi
 
-from geometry.opticaxis import opticaxisFactory, RuleHexArrayMap, OpticAxisRule
+from neurokernel.pattern import Pattern
 
+from geometry.opticaxis import opticaxisFactory, RuleHexArrayMap, OpticAxisRule
 
 def divceil(x, y):
     return (x+y-1)//y
@@ -237,23 +238,35 @@ class RetinaArray(object):
     def get_master_graph(self):
         return self.G_master
 
-    def update_pattern_master_worker(self, j, worker_num, pattern):
+    def update_pattern_master_worker(self, j, worker_num):
         indexes = self.get_worker_nodes(j, worker_num)
+        
+        master_selectors = self.get_master_selectors()
+        worker_selectors = self.get_worker_selectors(j, worker_num)
+        
+        from_list = []
+        to_list = []
 
         for i, ind in enumerate(indexes):
             col_m = ind // 6
             ind_m = 1 + (ind % 6)
             src = '/master/{}/buf{}'.format(col_m, ind_m)
             dest = '/ret/{}/in{}'.format(col_m, ind_m)
-            pattern.interface[src, 'type'] = 'gpot'
-            pattern.interface[dest, 'type'] = 'gpot'
-            pattern[src, dest] = 1
-
+            from_list.append(src)
+            to_list.append(dest)
+            
             src = '/ret/{}/R{}'.format(col_m, ind_m)
             dest = '/master/{}/R{}'.format(col_m, ind_m)
-            pattern.interface[src, 'type'] = 'gpot'
-            pattern.interface[dest, 'type'] = 'gpot'
-            pattern[src, dest] = 1
+            
+            from_list.append(src)
+            to_list.append(dest)
+
+        pattern = Pattern.from_concat(','.join(master_selectors),
+                                      ','.join(worker_selectors),
+                                      from_sel = ','.join(from_list),
+                                      to_sel = ','.join(to_list),
+                                      gpot_sel = ','.join(from_list+to_list))
+        return pattern
 
     # Neuron representation
     def get_neurons(self, j, sublpu_num):
