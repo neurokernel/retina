@@ -168,13 +168,14 @@ class Natural(Image2D):
     def __init__(self, config):
         super(Natural, self).__init__(config)
 
-        self.store_coords = config['Retina']['inputmethod'] != 'generate'
         input_config = self.get_input_config(config)
         self.set_parameters(input_config)
 
     def set_parameters(self, config):
         np.random.seed(config['seed'])
 
+        self.store_coords = config['store_coords']
+        self.coord_file_name = config['coord_file']
         self.image_file = config['image_file']
         self.scale = config['scale']
         self.speed = config['speed']
@@ -187,17 +188,14 @@ class Natural(Image2D):
         self.vx = np.random.randn(1)*self.speed
         self.vy = np.random.randn(1)*self.speed
         self.margin = 10
-
-        if self.store_coords:
-            self.coordfile = h5py.File(config['coord_file'], 'w')
-            self.coordfile.create_dataset('/array', (0, 2), dtype=np.int32,
-                                          maxshape = (None, 2))
+        self.file_open = False
 
         self.reset()
 
     def __del__(self):
         try:
             if self.store_coords:
+                print 'closing natural_xy file'
                 self.coordfile.close()
         except AttributeError:
             pass
@@ -231,6 +229,13 @@ class Natural(Image2D):
         imagex = self.imagex
         imagey = self.imagey
         margin = self.margin
+        
+        if not self.file_open:
+            if self.store_coords:
+                self.coordfile = h5py.File(self.coord_file_name, 'w')
+                self.coordfile.create_dataset('/array', (0, 2), dtype=np.int32,
+                                              maxshape = (None, 2))
+            self.file_open = True
 
         xy = np.zeros((num_steps, 2), np.int32)
 
@@ -261,8 +266,8 @@ class Natural(Image2D):
                 vy = -vy
 
             # decimal indices are allowed and decimal part is ignored
-            im_v[i] = image[imagex:imagex + shape[0],
-                            imagey:imagey + shape[1]]
+            im_v[i] = image[int(round(imagex)):int(round(imagex)) + shape[0],
+                            int(round(imagey)):int(round(imagey)) + shape[1]]
             xy[i, :] = (imagex, imagey)  # convert to int
 
             # change speed/direction every about 1/dt steps
