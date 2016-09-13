@@ -299,12 +299,12 @@ class BaseNeuron(object):
         }
         // can be improved
         """
-        mod = SourceModule(template % {"num_neurons": self.__num_neurons},
+        mod = SourceModule(template % {"num_neurons": self.num_neurons},
                            options = self.compile_options)
         func = mod.get_function("get_input")
         func.prepare(['PPPPPPP'])
         self.__block_get_input_cond = (32, 32, 1)
-        self.__grid_get_input_cond = ((self.__num_neurons - 1) / 32 + 1, 1)
+        self.__grid_get_input_cond = ((self.num_neurons - 1) / 32 + 1, 1)
         return func
 
     def get_update_I_non_cond_func(self):
@@ -395,10 +395,10 @@ class BaseNeuron(object):
         }
         //can be improved
         """
-        mod = SourceModule(template % {"num_neurons": self.__num_neurons},
+        mod = SourceModule(template % {"num_neurons": self.num_neurons},
                            options = self.compile_options)
         func = mod.get_function("get_input")
         func.prepare('PPPPP')
         self.__block_get_input_I = (32, 32, 1)
-        self.__grid_get_input_I = ((self.__num_neurons - 1) / 32 + 1, 1)
+        self.__grid_get_input_I = ((self.num_neurons - 1) / 32 + 1, 1)
         return func

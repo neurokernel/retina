@@ -238,7 +238,7 @@ def main():
             # sets retina attribute which is required for the generation of
             # receptive fields
             if generator is not None:
-                generator.retina = retina
+                generator.generate_datafiles(i, retina)
 
             add_master_LPU(config, i, retina, manager, generator)
 
