@@ -21,7 +21,7 @@ def gen_input(config):
 
     suffix = config['General']['file_suffix']
 
-    eye_num = config['General']['eye_num']
+    eye_num = 1 # config['General']['eye_num']
 
     eulerangles = config['Retina']['eulerangles']
     radius = config['Retina']['radius']
@@ -32,10 +32,10 @@ def gen_input(config):
     screen_type = config['Retina']['screentype']
     screen_cls = cls_map.get_screen_cls(screen_type)
 
-    screen = screen_cls(config)
-    screen.setup_file('intensities{}.h5'.format(suffix))
-
     for i in range(eye_num):
+        screen = screen_cls(config)
+        screen.setup_file('intensities{}{}.h5'.format(suffix,i))
+    
         retina_elev_file = 'retina_elev{}.h5'.format(i)
         retina_azim_file = 'retina_azim{}.h5'.format(i)
 
