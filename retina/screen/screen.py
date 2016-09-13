@@ -78,7 +78,7 @@ class Screen(object):
             self.store_to_file = True
             self.read_from_file = False
             self.skip_step = self.screen_write_step
-            self.step_count = 1
+            self.step_count = 0
 
     def get_screen_intensity_steps(self, num_steps):
         """ generate or read the next num_steps of inputs """
@@ -106,20 +106,19 @@ class Screen(object):
                 screens = self._interpolator.interpolate(images)
 
             if self.store_to_file:
-                # XXX relies on num_steps
-                # if num_steps is 1 all inputs are stored
-                # not every 10 of them
-                if num_steps > self.skip_step:
+                if num_steps >= self.skip_step:
                     dataset_append(self.outputfile['/array'],
-                        screens[self.skip_step-self.step_count-1::self.skip_step])
-                    self.step_count += num_steps%self.skip_step
-                    if self.step_count >= self.skip_step:
-                        self.step_count -= self.skip_step
+                        screens[(self.skip_step-self.step_count)%self.skip_step::self.skip_step])
+                    self.step_count = (self.step_count+num_steps)%self.skip_step
                 else:
+                    self.step_count %= self.skip_step
+                    if self.step_count == 0:
+                        dataset_append(self.outputfile['/array'], screens[[0]])
+                    
                     self.step_count += num_steps
-                    if self.step_count >= self.skip_step:
+                    if self.step_count > self.skip_step:
                         dataset_append(self.outputfile['/array'],
-                            screens[[num_steps-(self.step_count-self.skip_step)-1]])
+                            screens[[num_steps-(self.step_count-self.skip_step)]])
                         self.step_count -= self.skip_step
 
         except AttributeError:
