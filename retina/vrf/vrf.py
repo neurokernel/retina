@@ -162,6 +162,29 @@ class RF(object):
         del self.filters
         return d_output.T()
 
+    def filter_image_use(self, image_input):
+        """
+        Performs RF filtering on input video
+        for all the rfs
+        """
+        # video dimensions should match screen dimensions
+        # numpy resize operation doesn,t make any checks
+        if len(image_input.shape) == 2:
+            # if input has 2 dimensions
+            assert image_input.shape[1] == self.size
+        else:
+            # if input has 3 dimensions
+            assert (image_input.shape[1]*image_input.shape[2] ==
+                    self.size)
+
+        # rasterizing inputs
+        image_input.resize((1, self.size))
+
+        d_image = parray.to_gpu(image_input)
+        handle = la.cublashandle()
+
+        return la.dot(self.filters, d_image, opb='t', handle=handle).T()
+
 
 class Sphere_Gaussian_RF(RF):
     def __init__(self, grid):
