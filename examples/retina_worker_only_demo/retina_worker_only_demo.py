@@ -21,7 +21,6 @@ from neurokernel.LPU.OutputProcessors.FileOutputProcessor import FileOutputProce
 from retina.screen.map.mapimpl import AlbersProjectionMap
 from retina.configreader import ConfigReader
 
-
 dtype = np.double
 RECURSION_LIMIT = 80000
 
@@ -37,10 +36,8 @@ def setup_logging(config):
         screen = True
     logger = setup_logger(file_name=file_name, screen=screen)
 
-
 def get_retina_id(i):
     return 'retina{}'.format(i)
-
 
 # number of neurons of `j`th worker out of `worker_num`
 # with `total_neurons` neurons overall
