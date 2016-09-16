@@ -169,53 +169,43 @@ class RetinaArray(object):
                     ind = OpticAxisRule.name_to_ind(name)
                     G_workers.add_node(num_w2, neuron.params.copy())
                     G_workers.node[num_w2].update(
-                        {'selector': '/ret/{}/R{}'.format(i, ind),
-                         'extern': False})
+                        {'selector': '/ret/{}/R{}'.format(i, ind)})
                     G_workers.add_node(num_w2+num_photoreceptors, {
-                        'model': 'port_in_gpot',
+                        'class': 'Port',
                         'name': name,
-                        'extern': False,    # gets input from file?
-                        'public': False,    # is it output neuron?
+                        'port_type': 'gpot',
+                        'port_io': 'in',
                         'selector': '/ret/{}/in{}'.format(i, ind)
                     })
                     G_workers.add_edge(num_w2+num_photoreceptors,
-                                       num_w2, type='directed',
-                                       attr_dict={'name': '{}-{}'.format(
-                                                     num_w2+num_photoreceptors,
-                                                     num_w2),
-                                                  'model': 'DummySynapse',
-                                                  'class': 2,
-                                                  'conductance': False})
+                                       num_w2, type='directed')
 
                     num_w2 += 1
 
                     G_master.node[num_m] = {
-                        'model': 'BufferNeuron',
+                        'class': 'BufferNeuron',
                         'name': 'buf{}'.format(ind),
-                        'extern': True,  # gets input from file?
-                        'public': True,  # is it output neuron?
-                        'spiking': False,
                         'selector': '/master/{}/buf{}'.format(i, ind)
                     }
                     G_master.node[num_m+num_photoreceptors] = {
-                        'model': 'port_in_gpot',
+                        'class': 'Port',
+                        'port_type': 'gpot',
+                        'port_io': 'in',
                         'name': name,
-                        'extern': False,
-                        'public': True,
                         'selector': '/master/{}/R{}'.format(i, ind)
                     }
                     num_m += 1
 
-        num = 0
-        for omm in self._ommatidia:
-            for neuron in omm.neurons.itervalues():
-                for synapse in neuron.outgoing_synapses:
-                    synapse.params.update({'id': num})
-                    synapse.process_before_export()
-                    G_workers_nomaster.add_edge(synapse.pre_neuron.num,
-                               synapse.post_neuron.num,
-                               attr_dict=synapse.params.copy())
-                    num += 1
+#        num = 0
+#        for omm in self._ommatidia:
+#            for neuron in omm.neurons.itervalues():
+#                for synapse in neuron.outgoing_synapses:
+#                    synapse.params.update({'id': num})
+#                    synapse.process_before_export()
+#                    G_workers_nomaster.add_edge(synapse.pre_neuron.num,
+#                               synapse.post_neuron.num,
+#                               attr_dict=synapse.params.copy())
+#                    num += 1
 
         self.G_master = G_master
         self.G_workers = G_workers
