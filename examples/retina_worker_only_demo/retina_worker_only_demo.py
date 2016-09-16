@@ -20,6 +20,7 @@ from retina.InputProcessors.RetinaInputProcessor import RetinaInputProcessor
 from neurokernel.LPU.OutputProcessors.FileOutputProcessor import FileOutputProcessor
 from retina.screen.map.mapimpl import AlbersProjectionMap
 from retina.configreader import ConfigReader
+from retina.NDComponents.MembraneModels.Photoreceptor import Photoreceptor
 
 dtype = np.double
 RECURSION_LIMIT = 80000
@@ -69,7 +70,7 @@ def add_retina_LPU(config, i, retina, manager):
         input_processor = RetinaInputProcessor(config, retina)
 
     input_processor = get_input_gen(config, retina)
-    output_processor = FileOutputProcessor([('V',None)], 'retina_output0_gpot.h5', sample_interval=1)
+    output_processor = FileOutputProcessor([('V',None)], output_file, sample_interval=1)
 
     G = retina.get_worker_nomaster_graph()
     nx.write_gexf(G, gexf_file)
@@ -77,10 +78,12 @@ def add_retina_LPU(config, i, retina, manager):
     (comp_dict, conns) = LPU.lpu_parser_legacy(gexf_file)
     retina_id = get_retina_id(i)
 
+    extra_comps = [Photoreceptor]
+
     manager.add(LPU, retina_id, dt, comp_dict, conns,
                 device = i, input_processors = [input_processor],
                 output_processors = [output_processor],
-                debug=debug, time_sync=time_sync)
+                debug=debug, time_sync=time_sync, extra_comps = extra_comps)
 
 
 def start_simulation(config, manager):
