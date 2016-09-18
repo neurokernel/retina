@@ -151,6 +151,8 @@ class RetinaArray(object):
         G_master = nx.DiGraph()
         G_workers = nx.DiGraph()
         G_workers_nomaster = nx.DiGraph()
+        
+        self.worker_comp_list = []
 
         num_photoreceptors = self.num_photoreceptors
 
@@ -159,41 +161,53 @@ class RetinaArray(object):
         num_m = 0
         for i, omm in enumerate(self._ommatidia):
             for name, neuron in omm.neurons.items():
-                neuron.num = num_w1
-                G_workers_nomaster.add_node(num_w1, neuron.params.copy())
-                G_workers_nomaster.node[num_w1].update(
+                neuron.id = 'ret_{}_{}'.format(name, i)
+                G_workers_nomaster.add_node(neuron.id, neuron.params.copy())
+                G_workers_nomaster.node[neuron.id].update(
                     {'selector': '/ret/{}/{}'.format(i, name)})
                 num_w1 += 1
 
                 if OpticAxisRule.is_photor(name):
                     ind = OpticAxisRule.name_to_ind(name)
-                    G_workers.add_node(num_w2, neuron.params.copy())
-                    G_workers.node[num_w2].update(
-                        {'selector': '/ret/{}/R{}'.format(i, ind)})
-                    G_workers.add_node(num_w2+num_photoreceptors, {
+                    G_workers.add_node(neuron.id, neuron.params.copy())
+                    G_workers.node[neuron.id].update(
+                        {'selector': '/retina_worker/{}/R{}'.format(i, ind)})
+                        
+                    self.worker_comp_list.append(neuron.id)
+                    G_workers.add_node(neuron.id+'_in', {
                         'class': 'Port',
                         'name': name,
                         'port_type': 'gpot',
                         'port_io': 'in',
-                        'selector': '/ret/{}/in{}'.format(i, ind)
+                        'selector': '/retina_worker/{}/in{}'.format(i, ind)
                     })
-                    G_workers.add_edge(num_w2+num_photoreceptors,
-                                       num_w2, type='directed')
+                    G_workers.add_edge(neuron.id+'_in',
+                                       neuron.id, type='directed')
+
 
                     num_w2 += 1
 
-                    G_master.node[num_m] = {
-                        'class': 'BufferNeuron',
+                    G_master.add_node(neuron.id+'photon', {
+                        'class': 'BufferPhoton',
                         'name': 'buf{}'.format(ind),
-                        'selector': '/master/{}/buf{}'.format(i, ind)
-                    }
-                    G_master.node[num_m+num_photoreceptors] = {
+                        'selector': '/retina_master/{}/buf{}'.format(i, ind)
+                    })
+                    G_master.add_node(neuron.id+'buff_in', {
                         'class': 'Port',
                         'port_type': 'gpot',
                         'port_io': 'in',
+                        'name': 'collect_{}'.format(name),
+                        'selector': '/retina_master/{}/in{}'.format(i, ind)
+                    })
+                    G_master.add_node(neuron.id, {
+                        'class': 'BufferVoltage',
                         'name': name,
-                        'selector': '/master/{}/R{}'.format(i, ind)
-                    }
+                        'selector': '/ret/{}/R{}'.format(i, ind)
+                    })
+                    G_master.add_edge(neuron.id+'buff_in',
+                                      neuron.id,
+                                      type = 'directed')
+                    
                     num_m += 1
 
 #        num = 0
@@ -219,8 +233,8 @@ class RetinaArray(object):
 
     def get_worker_graph(self, *args):
         try:
-            nodes = self.get_worker_nodes(*args)
-            nodes += [i + self.num_photoreceptors for i in nodes]
+            nodes = self.get_worker_nodes_id(*args)
+            nodes += [i + '_in' for i in nodes]
             return self.G_workers.subgraph(nodes)
         except TypeError:
             return self.G_workers
@@ -240,13 +254,13 @@ class RetinaArray(object):
         for i, ind in enumerate(indexes):
             col_m = ind // 6
             ind_m = 1 + (ind % 6)
-            src = '/master/{}/buf{}'.format(col_m, ind_m)
-            dest = '/ret/{}/in{}'.format(col_m, ind_m)
+            src = '/retina_master/{}/buf{}'.format(col_m, ind_m)
+            dest = '/retina_worker/{}/in{}'.format(col_m, ind_m)
             from_list.append(src)
             to_list.append(dest)
             
-            src = '/ret/{}/R{}'.format(col_m, ind_m)
-            dest = '/master/{}/R{}'.format(col_m, ind_m)
+            src = '/retina_worker/{}/R{}'.format(col_m, ind_m)
+            dest = '/retina_master/{}/in{}'.format(col_m, ind_m)
             
             from_list.append(src)
             to_list.append(dest)
@@ -316,6 +330,10 @@ class RetinaArray(object):
     def get_worker_nodes(self, j, sublpu_num):
         # numbering starts from 1
         return list(range(*self.get_worker_interval(j, sublpu_num)))
+    
+    def get_worker_nodes_id(self, j, sublpu_num):
+        # numbering starts from 1
+        return self.worker_comp_list(range(*self.get_worker_interval(j, sublpu_num)))
 
     # Selector representation
     def get_selectors(self, j, sublpu_num):
@@ -337,8 +355,9 @@ class RetinaArray(object):
         for i in self.get_worker_nodes(1, 1):
             col = i // 6
             ind = 1 + (i % 6)
-            selectors.append('/master/{}/buf{}'.format(col, ind))
-            selectors.append('/master/{}/R{}'.format(col, ind))
+            selectors.append('/retina_master/{}/buf{}'.format(col, ind))
+            selectors.append('/retina_master/{}/in{}'.format(col, ind))
+            selectors.append('/ret/{}/R{}'.format(col, ind))
 
         return selectors
 
@@ -347,8 +366,8 @@ class RetinaArray(object):
         for i in self.get_worker_nodes(j, workernum):
             col = i // 6
             ind = 1 + (i % 6)
-            selectors.append('/ret/{}/in{}'.format(col, ind))
-            selectors.append('/ret/{}/R{}'.format(col, ind))
+            selectors.append('/retina_worker/{}/in{}'.format(col, ind))
+            selectors.append('/retina_worker/{}/R{}'.format(col, ind))
 
         return selectors
 

@@ -19,11 +19,9 @@ class RetinaInputProcessor(BaseInputProcessor):
         self.screen = screen_cls(config)
         self.retina = retina
         
-        g = retina.G_workers_nomaster
-        uids = []
-        for id, data in g.nodes(data=True):
-            if 'extern' in data and data['extern']:
-                uids.append(str(id))
+        uids = ['ret_{}_{}photon'.format(name, i) for i in range(retina.num_elements)
+                for name in ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']]
+
         
         super(RetinaInputProcessor, self).__init__([('photon',uids)], mode=0)
 

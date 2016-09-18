@@ -21,7 +21,10 @@ from neurokernel.LPU.OutputProcessors.FileOutputProcessor import FileOutputProce
 from retina.screen.map.mapimpl import AlbersProjectionMap
 from retina.configreader import ConfigReader
 from retina.NDComponents.MembraneModels.Photoreceptor import Photoreceptor
-from retina.NDComponents.MembraneModels.BufferNeuron import BufferNeuron
+from retina.NDComponents.MembraneModels.BufferPhoton import BufferPhoton
+from retina.NDComponents.MembraneModels.BufferVoltage import BufferVoltage
+
+import pickle
 
 dtype = np.double
 RECURSION_LIMIT = 80000
@@ -75,7 +78,7 @@ def add_master_LPU(config, i, retina, manager):
         input_processor = RetinaInputProcessor(config, retina)
 
     input_processor = get_input_gen(config, retina)
-    #output_processor = FileOutputProcessor([('V',None)], output_file, sample_interval=1)
+    output_processor = FileOutputProcessor([('V',None)], output_file, sample_interval=1)
 
     G = retina.get_master_graph()
     nx.write_gexf(G, gexf_file)
@@ -83,7 +86,7 @@ def add_master_LPU(config, i, retina, manager):
     (comp_dict, conns) = LPU.lpu_parser(gexf_file)
     master_id = get_master_id(i)
 
-    extra_comps = [BufferNeuron]
+    extra_comps = [BufferPhoton, BufferVoltage]
 
     manager.add(LPU, master_id, dt, comp_dict, conns,
                 device = i, input_processors = [input_processor],
@@ -103,7 +106,7 @@ def add_worker_LPU(config, i, retina, manager):
     gexf_file = '{}{}_{}{}.gexf.gz'.format(gexf_filename, 0, i, suffix)
 
     G = retina.get_worker_graph(i+1, worker_num)
-    G = nx.convert_node_labels_to_integers(G)
+    #G = nx.convert_node_labels_to_integers(G)
     nx.write_gexf(G, gexf_file)
 
     worker_dev = i
@@ -128,6 +131,8 @@ def connect_master_worker(config, i, retina, manager):
 
     with Timer('update of connections in Pattern object'):
         pattern = retina.update_pattern_master_worker(i+1, worker_num)
+        with open('pattern'+str(i),'wb') as f:
+            pickle.dump(pattern, f)
 
     with Timer('update of connections in Manager'):
         manager.connect(master_id, worker_id, pattern)

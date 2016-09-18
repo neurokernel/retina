@@ -7,9 +7,9 @@ from pycuda.compiler import SourceModule
 
 from neurokernel.LPU.NDComponents.MembraneModels.BaseMembraneModel import BaseMembraneModel
 
-class BufferPhoton(BaseMembraneModel):
-    updates = ['photon']
-    accesses = ['photon']
+class BufferVoltage(BaseMembraneModel):
+    updates = ['V']
+    accesses = ['V']
     def __init__(self, params_dict, access_buffers, dt, LPU_id=None,
                  debug=False, cuda_verbose=False):
         if cuda_verbose:
@@ -25,7 +25,7 @@ class BufferPhoton(BaseMembraneModel):
 
         self.params_dict = params_dict
         
-        self.num_neurons = params_dict['pre']['photon'].size
+        self.num_neurons = params_dict['pre']['V'].size
         self.access_buffers = access_buffers
         self.update = get_re_sort_func(self.dtype, self.compile_options)
         
@@ -35,19 +35,18 @@ class BufferPhoton(BaseMembraneModel):
     def run_step(self, update_pointers, st=None):
         self.update.prepared_async_call(
             self.grid_re_sort, self.block_re_sort, st,
-            self.access_buffers['photon'].gpudata,
-            update_pointers['photon'],
-            self.params_dict['pre']['photon'].gpudata,
-            self.params_dict['npre']['photon'].gpudata,
-            self.params_dict['cumpre']['photon'].gpudata,
+            self.access_buffers['V'].gpudata,
+            update_pointers['V'],
+            self.params_dict['pre']['V'].gpudata,
+            self.params_dict['npre']['V'].gpudata,
+            self.params_dict['cumpre']['V'].gpudata,
             self.num_neurons)
-
 
 def get_re_sort_func(dtype, compile_options):
     template = """
 
 __global__ void
-resort(%(type)s* in_photos, %(type)s* out_photons, int* pre, int* npre,
+resort(%(type)s* in_v, %(type)s* out_v, int* pre, int* npre,
        int* cumpre, int num_neurons)
 {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -56,7 +55,7 @@ resort(%(type)s* in_photos, %(type)s* out_photons, int* pre, int* npre,
     for(int i = tid; i < num_neurons; i += total_threads)
     {
         if(npre[i])
-            out_photons[i] = in_photos[pre[cumpre[i]]];
+            out_v[i] = in_v[pre[cumpre[i]]];
     }
 }
 """
