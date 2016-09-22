@@ -163,16 +163,29 @@ class RetinaArray(object):
             for name, neuron in omm.neurons.items():
                 neuron.id = 'ret_{}_{}'.format(name, i)
                 G_workers_nomaster.add_node(neuron.id, neuron.params.copy())
-                G_workers_nomaster.node[neuron.id].update(
-                    {'selector': '/ret/{}/{}'.format(i, name)})
+                G_workers_nomaster.add_node(
+                    neuron.id+'_port',
+                    {'class': 'Port', 'name': name+'_port',
+                     'port_type': 'gpot', 'port_io': 'out',
+                    'selector': '/ret/{}/{}'.format(i, name)})
+                G_workers_nomaster.add_node(
+                        neuron.id+'_photon',
+                        {'class': 'BufferPhoton',
+                        'name': '{}_buf'.format(name)
+                    })
+                G_workers_nomaster.add_edge(neuron.id, neuron.id+'_port',
+                                            type = 'directed')
+                G_workers_nomaster.add_edge(neuron.id+'_photon', neuron.id+'_port',
+                                            type = 'directed')
+                
                 num_w1 += 1
 
                 if OpticAxisRule.is_photor(name):
                     ind = OpticAxisRule.name_to_ind(name)
                     G_workers.add_node(neuron.id, neuron.params.copy())
-                    G_workers.node[neuron.id].update(
-                        {'selector': '/retina_worker/{}/R{}'.format(i, ind)})
-                        
+#                    G_workers.node[neuron.id].update(
+#                        {'selector': '/retina_worker/{}/R{}'.format(i, ind)})
+
                     self.worker_comp_list.append(neuron.id)
                     G_workers.add_node(neuron.id+'_in', {
                         'class': 'Port',
@@ -181,31 +194,60 @@ class RetinaArray(object):
                         'port_io': 'in',
                         'selector': '/retina_worker/{}/in{}'.format(i, ind)
                     })
+                    G_workers.add_node(neuron.id+'_out', {
+                        'class': 'Port',
+                        'name': name,
+                        'port_type': 'gpot',
+                        'port_io': 'out',
+                        'selector': '/retina_worker/{}/out{}'.format(i, ind)
+                    })
                     G_workers.add_edge(neuron.id+'_in',
                                        neuron.id, type='directed')
+                    G_workers.add_edge(neuron.id,
+                                       neuron.id+'_out', type='directed')
+
 
 
                     num_w2 += 1
 
-                    G_master.add_node(neuron.id+'photon', {
+                    G_master.add_node(neuron.id+'_photon', {
                         'class': 'BufferPhoton',
-                        'name': 'buf{}'.format(ind),
-                        'selector': '/retina_master/{}/buf{}'.format(i, ind)
+                        'name': 'buf{}'.format(ind)
                     })
-                    G_master.add_node(neuron.id+'buff_in', {
+                    G_master.add_node(neuron.id+'_buff_in', {
                         'class': 'Port',
                         'port_type': 'gpot',
                         'port_io': 'in',
                         'name': 'collect_{}'.format(name),
                         'selector': '/retina_master/{}/in{}'.format(i, ind)
                     })
+                    G_master.add_node(neuron.id+'_photon_out', {
+                        'class': 'Port',
+                        'port_type': 'gpot',
+                        'port_io': 'out',
+                        'name': 'port_buf_{}'.format(name),
+                        'selector': '/retina_master/{}/buf{}'.format(i, ind)
+                    })
                     G_master.add_node(neuron.id, {
                         'class': 'BufferVoltage',
+                        'name': 'buf_voltage_{}'.format(name)
+                    })
+                    G_master.add_node(neuron.id+'_out', {
+                        'class': 'Port',
+                        'port_type': 'gpot',
+                        'port_io': 'out',
                         'name': name,
                         'selector': '/ret/{}/R{}'.format(i, ind)
                     })
-                    G_master.add_edge(neuron.id+'buff_in',
+                    
+                    G_master.add_edge(neuron.id+'_photon',
+                                      neuron.id+'_photon_out',
+                                      type = 'directed')
+                    G_master.add_edge(neuron.id+'_buff_in',
                                       neuron.id,
+                                      type = 'directed')
+                    G_master.add_edge(neuron.id,
+                                      neuron.id+'_out',
                                       type = 'directed')
                     
                     num_m += 1
@@ -259,7 +301,7 @@ class RetinaArray(object):
             from_list.append(src)
             to_list.append(dest)
             
-            src = '/retina_worker/{}/R{}'.format(col_m, ind_m)
+            src = '/retina_worker/{}/out{}'.format(col_m, ind_m)
             dest = '/retina_master/{}/in{}'.format(col_m, ind_m)
             
             from_list.append(src)
@@ -367,7 +409,7 @@ class RetinaArray(object):
             col = i // 6
             ind = 1 + (i % 6)
             selectors.append('/retina_worker/{}/in{}'.format(col, ind))
-            selectors.append('/retina_worker/{}/R{}'.format(col, ind))
+            selectors.append('/retina_worker/{}/out{}'.format(col, ind))
 
         return selectors
 

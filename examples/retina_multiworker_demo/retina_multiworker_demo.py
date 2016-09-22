@@ -55,7 +55,7 @@ def get_worker_num_neurons(j, total_neurons, worker_num):
     return min(num_neurons, total_neurons - j*num_neurons)
 
 
-def add_master_LPU(config, i, retina, manager):
+def add_master_LPU(config, retina_index, retina, manager):
     dt = config['General']['dt']
     debug = config['Retina']['debug']
     time_sync = config['Retina']['time_sync']
@@ -65,8 +65,8 @@ def add_master_LPU(config, i, retina, manager):
     gexf_filename = config['Retina']['gexf_file']
     suffix = config['General']['file_suffix']
 
-    output_file = '{}{}{}.h5'.format(output_filename, i, suffix)
-    gexf_file = '{}{}{}.gexf.gz'.format(gexf_filename, i, suffix)
+    output_file = '{}{}{}.h5'.format(output_filename, retina_index, suffix)
+    gexf_file = '{}{}{}.gexf.gz'.format(gexf_filename, retina_index, suffix)
 
     inputmethod = config['Retina']['inputmethod']
     if inputmethod == 'read':
@@ -78,23 +78,25 @@ def add_master_LPU(config, i, retina, manager):
         input_processor = RetinaInputProcessor(config, retina)
 
     input_processor = get_input_gen(config, retina)
-    output_processor = FileOutputProcessor([('V',None)], output_file, sample_interval=1)
+    uids_to_record = ['ret_{}_{}'.format(name, i) for i in range(retina.num_elements)
+                for name in ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']]
+    output_processor = FileOutputProcessor([('V',uids_to_record)], output_file, sample_interval=1)
 
     G = retina.get_master_graph()
     nx.write_gexf(G, gexf_file)
 
     (comp_dict, conns) = LPU.lpu_parser(gexf_file)
-    master_id = get_master_id(i)
+    master_id = get_master_id(retina_index)
 
     extra_comps = [BufferPhoton, BufferVoltage]
 
     manager.add(LPU, master_id, dt, comp_dict, conns,
-                device = i, input_processors = [input_processor],
-                #output_processors = [output_processor],
+                device = retina_index, input_processors = [input_processor],
+                output_processors = [output_processor],
                 debug=debug, time_sync=time_sync, extra_comps = extra_comps)
 
 
-def add_worker_LPU(config, i, retina, manager):
+def add_worker_LPU(config, retina_index, retina, manager):
     gexf_filename = config['Retina']['gexf_file']
     suffix = config['General']['file_suffix']
 
@@ -103,16 +105,16 @@ def add_worker_LPU(config, i, retina, manager):
     time_sync = config['Retina']['time_sync']
 
     worker_num = config['Retina']['worker_num']
-    gexf_file = '{}{}_{}{}.gexf.gz'.format(gexf_filename, 0, i, suffix)
+    gexf_file = '{}{}_{}{}.gexf.gz'.format(gexf_filename, 0, retina_index, suffix)
 
-    G = retina.get_worker_graph(i+1, worker_num)
+    G = retina.get_worker_graph(retina_index+1, worker_num)
     #G = nx.convert_node_labels_to_integers(G)
     nx.write_gexf(G, gexf_file)
 
-    worker_dev = i
+    worker_dev = retina_index
 
     (comp_dict, conns) = LPU.lpu_parser(gexf_file)
-    worker_id = get_worker_id(i)
+    worker_id = get_worker_id(retina_index)
     
     extra_comps = [Photoreceptor]
     manager.add(LPU, worker_id, dt, comp_dict, conns,

@@ -19,7 +19,7 @@ class RetinaInputProcessor(BaseInputProcessor):
         self.screen = screen_cls(config)
         self.retina = retina
         
-        uids = ['ret_{}_{}photon'.format(name, i) for i in range(retina.num_elements)
+        uids = ['ret_{}_{}_photon'.format(name, i) for i in range(retina.num_elements)
                 for name in ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']]
 
         
