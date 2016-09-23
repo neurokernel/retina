@@ -24,8 +24,6 @@ from retina.NDComponents.MembraneModels.Photoreceptor import Photoreceptor
 from retina.NDComponents.MembraneModels.BufferPhoton import BufferPhoton
 from retina.NDComponents.MembraneModels.BufferVoltage import BufferVoltage
 
-import pickle
-
 dtype = np.double
 RECURSION_LIMIT = 80000
 
@@ -133,8 +131,6 @@ def connect_master_worker(config, i, retina, manager):
 
     with Timer('update of connections in Pattern object'):
         pattern = retina.update_pattern_master_worker(i+1, worker_num)
-        with open('pattern'+str(i),'wb') as f:
-            pickle.dump(pattern, f)
 
     with Timer('update of connections in Manager'):
         manager.connect(master_id, worker_id, pattern)
