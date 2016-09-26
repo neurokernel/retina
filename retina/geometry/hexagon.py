@@ -165,6 +165,9 @@ class HexagonArray(object):
         # (1 for each direction) to 2D cartesian coordinates
         self._loc = np.dot(v, dd)
 
+    def get_maximum_radius(self):
+        return self._num_rings*self._get_column_d()
+
     def _filter_elements(self):
         # Returns elements in a circle
         ind = (

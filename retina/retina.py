@@ -147,6 +147,46 @@ class RetinaArray(object):
         positions = np.array([omm.sphere_pos for omm in self._ommatidia])
         return positions[:, 0], positions[:, 1]
 
+    def generate_neuroarch_gexf(self):
+        G_neuroarch = nx.DiGraph()
+        hex_loc = self.hex_array.hex_loc
+        
+        for i, omm in enumerate(self._ommatidia):
+            sphere_pos = omm.sphere_pos
+            hx_loc = hex_loc[i]
+            circuit_name = 'ommatidium_{}'.format(i)
+            
+            G_neuroarch.add_node('circuit_'+ circuit_name,
+                                 {'3d_elev': sphere_pos[0],
+                                  '3d_azim': sphere_pos[1],
+                                  '2d_x': hx_loc[0],
+                                  '2d_y': hx_loc[1]})
+                                  
+            for name, neuron in omm.neurons.items():
+                direction = neuron.direction
+                neuron.id = 'neuron_{}_{}'.format(name, i)
+                G_neuroarch.add_node(neuron.id, neuron.params.copy())
+                G_neuroarch.node[neuron.id].update(
+                    {'3d_elev': sphere_pos[0],
+                     '3d_azim': sphere_pos[1],
+                     '2d_x': hx_loc[0],
+                     '2d_y': hx_loc[1],
+                     'genetic.neurotransmitter': 'histamine',
+                     'optic_axis_elev': direction[0],
+                     'optic_axis_azim': direction[1],
+                     'circuit': circuit_name})
+                G_neuroarch.add_node(
+                    neuron.id+'_port',
+                    {'class': 'Port', 'name': name+'_port',
+                     'port_type': 'gpot', 'port_io': 'out',
+                     'circuit', circuit_name,
+                    'selector': '/ret/{}/{}'.format(i, name)})
+                G_neuroarch.add_edge(neuron.id, neuron.id+'_port',
+                                            type = 'directed')
+    
+    
+        return G_neuroarch
+
     def _generate_graph(self):
         G_master = nx.DiGraph()
         G_workers = nx.DiGraph()
@@ -159,9 +199,10 @@ class RetinaArray(object):
         num_w1 = 0  # workers no master counter
         num_w2 = 0  # workers counter
         num_m = 0
+        
         for i, omm in enumerate(self._ommatidia):
             for name, neuron in omm.neurons.items():
-                neuron.id = 'ret_{}_{}'.format(name, i)
+                neuron.id = 'neuron_{}_{}'.format(name, i)
                 G_workers_nomaster.add_node(neuron.id, neuron.params.copy())
                 G_workers_nomaster.add_node(
                     neuron.id+'_port',
@@ -175,9 +216,8 @@ class RetinaArray(object):
                     })
                 G_workers_nomaster.add_edge(neuron.id, neuron.id+'_port',
                                             type = 'directed')
-                G_workers_nomaster.add_edge(neuron.id+'_photon', neuron.id+'_port',
+                G_workers_nomaster.add_edge(neuron.id+'_photon', neuron.id,
                                             type = 'directed')
-                
                 num_w1 += 1
 
                 if OpticAxisRule.is_photor(name):
