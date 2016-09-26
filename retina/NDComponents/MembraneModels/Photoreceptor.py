@@ -10,7 +10,7 @@ from neurokernel.LPU.utils.simpleio import *
 from neurokernel.LPU.NDComponents.MembraneModels.BaseMembraneModel import BaseMembraneModel
 
 class Photoreceptor(BaseMembraneModel):
-    accesses = ['photon']
+    accesses = ['photon', 'I']
     updates = ['V']
 
     def __init__(self, params_dict, access_buffers, dt, LPU_id=None,
@@ -152,7 +152,8 @@ class Photoreceptor(BaseMembraneModel):
         self.hh_func = get_hh_func(self.dtype, self.compile_options)
 
     def run_step(self, update_pointers, st=None):
-        #self.sum_in_variable('I', self.I)
+        if self.params_dict['pre']['I'].size > 0:
+            self.sum_in_variable('I', self.I)
         
         self.re_sort_func.prepared_async_call(
                 self.grid_re_sort, self.block_re_sort, st,
