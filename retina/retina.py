@@ -148,7 +148,7 @@ class RetinaArray(object):
         return positions[:, 0], positions[:, 1]
 
     def generate_neuroarch_gexf(self):
-        G_neuroarch = nx.DiGraph()
+        G_neuroarch = nx.MultiDiGraph()
         hex_loc = self.hex_array.hex_loc
         
         for i, omm in enumerate(self._ommatidia):
@@ -157,30 +157,32 @@ class RetinaArray(object):
             circuit_name = 'ommatidium_{}'.format(i)
             
             G_neuroarch.add_node('circuit_'+ circuit_name,
-                                 {'3d_elev': sphere_pos[0],
-                                  '3d_azim': sphere_pos[1],
-                                  '2d_x': hx_loc[0],
-                                  '2d_y': hx_loc[1]})
+                                 {'name': circuit_name,
+                                  '3d_elev': float(sphere_pos[0]),
+                                  '3d_azim': float(sphere_pos[1]),
+                                  '2d_x': float(hx_loc[0]),
+                                  '2d_y': float(hx_loc[1])})
                                   
             for name, neuron in omm.neurons.items():
                 direction = neuron.direction
                 neuron.id = 'neuron_{}_{}'.format(name, i)
                 G_neuroarch.add_node(neuron.id, neuron.params.copy())
                 G_neuroarch.node[neuron.id].update(
-                    {'3d_elev': sphere_pos[0],
-                     '3d_azim': sphere_pos[1],
-                     '2d_x': hx_loc[0],
-                     '2d_y': hx_loc[1],
+                    {'name': name,
+                     '3d_elev': float(sphere_pos[0]),
+                     '3d_azim': float(sphere_pos[1]),
+                     '2d_x': float(hx_loc[0]),
+                     '2d_y': float(hx_loc[1]),
                      'genetic.neurotransmitter': 'histamine',
-                     'optic_axis_elev': direction[0],
-                     'optic_axis_azim': direction[1],
+                     'optic_axis_elev': float(direction[0]),
+                     'optic_axis_azim': float(direction[1]),
                      'circuit': circuit_name})
                 G_neuroarch.add_node(
                     neuron.id+'_port',
                     {'class': 'Port', 'name': name+'_port',
                      'port_type': 'gpot', 'port_io': 'out',
-                     'circuit', circuit_name,
-                    'selector': '/ret/{}/{}'.format(i, name)})
+                     'circuit': circuit_name,
+                     'selector': '/ret/{}/{}'.format(i, name)})
                 G_neuroarch.add_edge(neuron.id, neuron.id+'_port',
                                             type = 'directed')
     
@@ -595,4 +597,19 @@ class Synapse(object):
             self._params['saturation'] *= self._params['scale']
             del self._params['scale']
 
+def main():
 
+    from retina.screen.map.mapimpl import AlbersProjectionMap
+    import retina.geometry.hexagon as hex
+    from retina.configreader import ConfigReader
+    import retina.retina as ret
+    import networkx as nx
+    config=ConfigReader('retlam_default.cfg','../template_spec.cfg').conf
+    transform = AlbersProjectionMap(config['Retina']['radius'],config['Retina']['eulerangles']).invmap
+    hexarray = hex.HexagonArray(num_rings = 14, radius = config['Retina']['radius'], transform = transform)
+    a = ret.RetinaArray(hexarray, config)
+    G = a.generate_neuroarch_gexf()
+    nx.write_gexf(G, 'retina_neuroarch.gexf.gz')
+
+if __name__ == "__main__":
+    main()
