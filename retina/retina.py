@@ -147,7 +147,7 @@ class RetinaArray(object):
         positions = np.array([omm.sphere_pos for omm in self._ommatidia])
         return positions[:, 0], positions[:, 1]
 
-    def generate_neuroarch_gexf(self):
+    def generate_neuroarch_gexf(self, G_lamina = None):
         G_neuroarch = nx.MultiDiGraph()
         hex_loc = self.hex_array.hex_loc
         
@@ -185,8 +185,50 @@ class RetinaArray(object):
                      'selector': '/ret/{}/{}'.format(i, name)})
                 G_neuroarch.add_edge(neuron.id, neuron.id+'_port',
                                             type = 'directed')
-    
-    
+                G_neuroarch.add_node(
+                    neuron.id+'_aggregator_port',
+                    {'class': 'Port', 'name': name+'_aggregator_port',
+                     'port_type': 'gpot', 'port_io': 'in',
+                     'circuit': circuit_name,
+                     'selector': '/ret/{}/{}_agg'.format(i,name)})
+                G_neuroarch.add_edge(neuron.id+'_aggregator_port', neuron.id,
+                                     type = 'directed')
+
+#        if G_lamina is None:
+#            return G_neuroarch
+#            
+#        all_edge_going_to_retina = [edge for edge in G_lamina.edges() \
+#                    if edge[1].startswith('neuron_R')]
+#        
+#        num_synapses = 0
+#
+#        for edge in all_edge_going_to_retina:
+#            synapse = edge[0]
+#            # find the in neuron
+#            pre_neuron = G_lamina.in_edges(synapse)[0][0]
+#            # find the port associated with the pre_neuron
+#            pre_neuron_port = [tmp for tmp in G_lamina.out_edges(pre_neuron) \
+#                               if tmp[1].endswith('port')][0][1]
+#            # create the input port node if it does not exist
+#            if not G_neuroarch.has_node(pre_neuron_port):
+#                neuron = G.node['neuron_Am_186_port']
+#                sel = '/'.join(['/ret']+neuron['selector'].split('/')[2:])
+#                G_neuroarch.add_node(pre_neuron_port,
+#                                     {'circuit': neuron['circuit'],
+#                                      'class': 'Port',
+#                                      'name': pre_neuron_port,
+#                                      'port_io': 'in',
+#                                      'port_type': neuron['port_type'],
+#                                      'selector': sel})
+#            # create synapse node
+#            new_synapse_id = 'synapse_{}'.format(num_synapses)
+#            G_neuroarch.add_node(synapse,
+#                                 G_lamina.node[synapse])
+#
+#
+#
+#            num_synapses += 1
+
         return G_neuroarch
 
     def _generate_graph(self):
@@ -216,10 +258,17 @@ class RetinaArray(object):
                         {'class': 'BufferPhoton',
                         'name': '{}_buf'.format(name)
                     })
-                G_workers_nomaster.add_edge(neuron.id, neuron.id+'_port',
-                                            type = 'directed')
-                G_workers_nomaster.add_edge(neuron.id+'_photon', neuron.id,
-                                            type = 'directed')
+                G_workers_nomaster.add_edge(neuron.id, neuron.id+'_port')
+                G_workers_nomaster.add_edge(neuron.id+'_photon', neuron.id)
+                G_workers_nomaster.add_node(
+                    neuron.id+'_aggregator_port',
+                    {'class': 'Port',
+                     'name': name+'_aggregator_port',
+                     'port_type': 'gpot',
+                     'port_io': 'in',
+                     'selector': '/ret/{}/{}_agg'.format(i,name)})
+                G_workers_nomaster.add_edge(neuron.id+'_aggregator_port',
+                                            neuron.id)
                 num_w1 += 1
 
                 if OpticAxisRule.is_photor(name):
@@ -234,21 +283,28 @@ class RetinaArray(object):
                         'name': name,
                         'port_type': 'gpot',
                         'port_io': 'in',
-                        'selector': '/retina_worker/{}/in{}'.format(i, ind)
+                        'selector': '/retina_worker/{}/in_R{}'.format(i, ind)
                     })
                     G_workers.add_node(neuron.id+'_out', {
                         'class': 'Port',
                         'name': name,
                         'port_type': 'gpot',
                         'port_io': 'out',
-                        'selector': '/retina_worker/{}/out{}'.format(i, ind)
+                        'selector': '/retina_worker/{}/out_R{}'.format(i, ind)
                     })
                     G_workers.add_edge(neuron.id+'_in',
-                                       neuron.id, type='directed')
+                                       neuron.id)
                     G_workers.add_edge(neuron.id,
-                                       neuron.id+'_out', type='directed')
-
-
+                                       neuron.id+'_out')
+                    G_workers.add_node(neuron.id+'_aggregator_port', {
+                        'class': 'Port',
+                        'name': name,
+                        'port_type': 'gpot',
+                        'port_io': 'in',
+                        'selector': '/retina_worker/{}/agg_R{}'.format(i, ind)
+                    })
+                    G_workers.add_edge(neuron.id+'_aggregator_port',
+                                       neuron.id, variable = 'I')
 
                     num_w2 += 1
 
@@ -261,14 +317,14 @@ class RetinaArray(object):
                         'port_type': 'gpot',
                         'port_io': 'in',
                         'name': 'collect_{}'.format(name),
-                        'selector': '/retina_master/{}/in{}'.format(i, ind)
+                        'selector': '/retina_master/{}/in_R{}'.format(i, ind)
                     })
                     G_master.add_node(neuron.id+'_photon_out', {
                         'class': 'Port',
                         'port_type': 'gpot',
                         'port_io': 'out',
                         'name': 'port_buf_{}'.format(name),
-                        'selector': '/retina_master/{}/buf{}'.format(i, ind)
+                        'selector': '/retina_master/{}/buf_R{}'.format(i, ind)
                     })
                     G_master.add_node(neuron.id, {
                         'class': 'BufferVoltage',
@@ -281,16 +337,34 @@ class RetinaArray(object):
                         'name': name,
                         'selector': '/ret/{}/R{}'.format(i, ind)
                     })
+                    G_master.add_edge(neuron.id+'_photon', neuron.id+'_photon_out')
+                    G_master.add_edge(neuron.id+'_buff_in', neuron.id)
+                    G_master.add_edge(neuron.id, neuron.id+'_out')
                     
-                    G_master.add_edge(neuron.id+'_photon',
-                                      neuron.id+'_photon_out',
-                                      type = 'directed')
-                    G_master.add_edge(neuron.id+'_buff_in',
-                                      neuron.id,
-                                      type = 'directed')
-                    G_master.add_edge(neuron.id,
-                                      neuron.id+'_out',
-                                      type = 'directed')
+                    G_master.add_node(neuron.id+'_aggregator_out', {
+                        'class': 'Port',
+                        'port_type': 'gpot',
+                        'port_io': 'out',
+                        'name': name,
+                        'selector': '/retina_master/{}/agg_R{}'.format(i, ind)
+                    })
+                    G_master.add_node(neuron.id+'_aggregator_in', {
+                        'class': 'Port',
+                        'port_type': 'gpot',
+                        'port_io': 'in',
+                        'name': name,
+                        'selector': '/ret/{}/R{}_agg'.format(i, ind)
+                    })
+                    G_master.add_node(neuron.id+'_buff_current', {
+                        'class': 'BufferCurrent',
+                        'name': 'buff_current_'+name,
+                    })
+                    G_master.add_edge(neuron.id+'_aggregator_in',
+                                      neuron.id+'buff_current',
+                                      variable = 'I')
+                    G_master.add_edge(neuron.id+'_buff_current',
+                                      neuron.id+'aggregator_out',
+                                      variable = 'I')
                     
                     num_m += 1
 
@@ -319,6 +393,7 @@ class RetinaArray(object):
         try:
             nodes = self.get_worker_nodes_id(*args)
             nodes += [i + '_in' for i in nodes]
+            nodes += [i + '_aggregator_port' for i in nodes]
             return self.G_workers.subgraph(nodes)
         except TypeError:
             return self.G_workers
@@ -338,14 +413,18 @@ class RetinaArray(object):
         for i, ind in enumerate(indexes):
             col_m = ind // 6
             ind_m = 1 + (ind % 6)
-            src = '/retina_master/{}/buf{}'.format(col_m, ind_m)
-            dest = '/retina_worker/{}/in{}'.format(col_m, ind_m)
+            src = '/retina_master/{}/buf_R{}'.format(col_m, ind_m)
+            dest = '/retina_worker/{}/in_R{}'.format(col_m, ind_m)
             from_list.append(src)
             to_list.append(dest)
             
-            src = '/retina_worker/{}/out{}'.format(col_m, ind_m)
-            dest = '/retina_master/{}/in{}'.format(col_m, ind_m)
-            
+            src = '/retina_worker/{}/out_R{}'.format(col_m, ind_m)
+            dest = '/retina_master/{}/in_R{}'.format(col_m, ind_m)
+            from_list.append(src)
+            to_list.append(dest)
+        
+            src = '/retina_master/{}/agg_R{}'.format(col_m, ind_m)
+            dest = '/retina_worker/{}/agg_R{}'.format(col_m, ind_m)
             from_list.append(src)
             to_list.append(dest)
 
@@ -426,6 +505,7 @@ class RetinaArray(object):
         for n in self.get_neurons(j, sublpu_num):
             n_id, n_name, _ = n
             selectors.append('/ret/{}/{}'.format(n_id, n_name))
+            selectors.append('/ret/{}/{}_agg'.format(n_id, n_name))
         return selectors
 
     # Selector representation (all)
