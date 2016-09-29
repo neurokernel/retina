@@ -268,7 +268,7 @@ class RetinaArray(object):
                      'port_io': 'in',
                      'selector': '/ret/{}/{}_agg'.format(i,name)})
                 G_workers_nomaster.add_edge(neuron.id+'_aggregator_port',
-                                            neuron.id)
+                                            neuron.id, variable = 'I')
                 num_w1 += 1
 
                 if OpticAxisRule.is_photor(name):
