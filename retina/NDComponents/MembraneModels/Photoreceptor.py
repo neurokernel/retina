@@ -132,6 +132,8 @@ class Photoreceptor(BaseMembraneModel):
 
     def _setup_hh(self):
         self.I = garray.zeros(self.num_neurons, self.dtype)
+        self.I_fb = garray.zeros(self.num_neurons, self.dtype)
+        
         self.hhx = [garray.empty(self.num_neurons, self.dtype)
                     for _ in range(5)]
 
@@ -152,8 +154,9 @@ class Photoreceptor(BaseMembraneModel):
         self.hh_func = get_hh_func(self.dtype, self.compile_options)
 
     def run_step(self, update_pointers, st=None):
+        self.I_fb.fill(0)
         if self.params_dict['pre']['I'].size > 0:
-            self.sum_in_variable('I', self.I)
+            self.sum_in_variable('I', self.I_fb)
         
         self.re_sort_func.prepared_async_call(
                 self.grid_re_sort, self.block_re_sort, st,
@@ -189,7 +192,7 @@ class Photoreceptor(BaseMembraneModel):
                 self.grid_sum, self.block_sum,
                 self.X[2].gpudata, self.d_num_microvilli.gpudata,
                 self.d_cum_microvilli.gpudata,
-                update_pointers['V'], self.I.gpudata)#, self.I_fb.gpudata)
+                update_pointers['V'], self.I.gpudata, self.I_fb.gpudata)
                 
             # hhX, I -> hhX, V
             self.hh_func.prepared_call(
@@ -1002,8 +1005,8 @@ int warpReduceSum(int val) {
 __global__ void
 sum_current(ushort2* d_Tstar, int* d_num_microvilli,
             int* d_cum_microvilli,
-            %(type)s* d_Vm, %(type)s* I_all)//,
-//            %(type)s* I_fb)
+            %(type)s* d_Vm, %(type)s* I_all,
+            %(type)s* I_fb)
 {
     int tid = threadIdx.x;
     int bid = blockIdx.x;
@@ -1037,8 +1040,7 @@ sum_current(ushort2* d_Tstar, int* d_num_microvilli,
         else
             I_in = 0;
 
-        //I_all[bid] = I_fb[bid] + I_in / 15.7; // convert pA into \muA/cm^2
-        I_all[bid] = I_in / 15.7; // convert pA into \muA/cm^2
+        I_all[bid] = I_fb[bid] + I_in / 15.7; // convert pA into \muA/cm^2
     }
 }
 """
@@ -1047,7 +1049,6 @@ sum_current(ushort2* d_Tstar, int* d_num_microvilli,
                                    "block_size": block_size},
                        options = compile_options)
     func = mod.get_function('sum_current')
-#    func.prepare('PPPPPP')
-    func.prepare('PPPPP')
+    func.prepare('PPPPPP')
     return func
 

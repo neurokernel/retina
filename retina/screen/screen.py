@@ -2,6 +2,7 @@ from __future__ import division
 
 import os
 from abc import ABCMeta, abstractmethod, abstractproperty
+import contextlib
 
 import numpy as np
 from neurokernel.LPU.utils.simpleio import *
@@ -91,8 +92,7 @@ class Screen(object):
                 self.outputfile.create_dataset(
                     '/array', (0, self._height, self._width),
                     dtype = self._dtype,
-                    maxshape=(None, self._height, self._width),
-                    compression = 9)
+                    maxshape=(None, self._height, self._width))
             self.file_open = True
         try:
             if self.read_from_file:

@@ -157,7 +157,7 @@ class RetinaArray(object):
             circuit_name = 'ommatidium_{}'.format(i)
             
             G_neuroarch.add_node('circuit_'+ circuit_name,
-                                 {'name': circuit_name,
+                                 {'name': 'Ommatidium',
                                   '3d_elev': float(sphere_pos[0]),
                                   '3d_azim': float(sphere_pos[1]),
                                   '2d_x': float(hx_loc[0]),
@@ -179,20 +179,20 @@ class RetinaArray(object):
                      'circuit': circuit_name})
                 G_neuroarch.add_node(
                     neuron.id+'_port',
-                    {'class': 'Port', 'name': name+'_port',
+                    {'class': 'Port', 'name': name,
                      'port_type': 'gpot', 'port_io': 'out',
                      'circuit': circuit_name,
                      'selector': '/ret/{}/{}'.format(i, name)})
-                G_neuroarch.add_edge(neuron.id, neuron.id+'_port',
-                                            type = 'directed')
+                G_neuroarch.add_edge(neuron.id, neuron.id+'_port')
                 G_neuroarch.add_node(
                     neuron.id+'_aggregator_port',
-                    {'class': 'Port', 'name': name+'_aggregator_port',
+                    {'class': 'Port', 'name': name,
                      'port_type': 'gpot', 'port_io': 'in',
                      'circuit': circuit_name,
                      'selector': '/ret/{}/{}_agg'.format(i,name)})
                 G_neuroarch.add_edge(neuron.id+'_aggregator_port', neuron.id,
-                                     type = 'directed')
+                                     variable = 'I')
+    
 
 #        if G_lamina is None:
 #            return G_neuroarch
@@ -250,7 +250,7 @@ class RetinaArray(object):
                 G_workers_nomaster.add_node(neuron.id, neuron.params.copy())
                 G_workers_nomaster.add_node(
                     neuron.id+'_port',
-                    {'class': 'Port', 'name': name+'_port',
+                    {'class': 'Port', 'name': name,
                      'port_type': 'gpot', 'port_io': 'out',
                     'selector': '/ret/{}/{}'.format(i, name)})
                 G_workers_nomaster.add_node(
@@ -263,7 +263,7 @@ class RetinaArray(object):
                 G_workers_nomaster.add_node(
                     neuron.id+'_aggregator_port',
                     {'class': 'Port',
-                     'name': name+'_aggregator_port',
+                     'name': name,
                      'port_type': 'gpot',
                      'port_io': 'in',
                      'selector': '/ret/{}/{}_agg'.format(i,name)})
