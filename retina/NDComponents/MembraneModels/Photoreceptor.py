@@ -995,13 +995,6 @@ int warpReduction(volatile int* sdata, int tid){
     return sdata[tid] + sdata[tid+1];
 }
 
-__inline__ __device__
-int warpReduceSum(int val) {
-  for (int offset = warpSize/2; offset > 0; offset /= 2) 
-    val += __shfl_down(val, offset);
-  return val;
-}
-
 __global__ void
 sum_current(ushort2* d_Tstar, int* d_num_microvilli,
             int* d_cum_microvilli,
