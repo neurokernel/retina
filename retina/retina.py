@@ -176,7 +176,8 @@ class RetinaArray(object):
                      'genetic.neurotransmitter': 'histamine',
                      'optic_axis_elev': float(direction[0]),
                      'optic_axis_azim': float(direction[1]),
-                     'circuit': circuit_name})
+                     'circuit': circuit_name,
+                     'acceptance_angle': self.get_angle()})
                 G_neuroarch.add_node(
                     neuron.id+'_port',
                     {'class': 'Port', 'name': name,
