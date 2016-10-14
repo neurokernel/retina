@@ -9,7 +9,7 @@ from neurokernel.LPU.utils.simpleio import *
 
 from neurokernel.LPU.NDComponents.MembraneModels.BaseMembraneModel import BaseMembraneModel
 
-class Photoreceptor(BaseMembraneModel):
+class PhotoreceptorModel(BaseMembraneModel):
     accesses = ['photon', 'I']
     updates = ['V']
 
