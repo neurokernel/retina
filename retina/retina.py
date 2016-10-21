@@ -58,7 +58,7 @@ class Ommatidium(object):
 
 
 class RetinaArray(object):
-    def __init__(self, hex_array, config):
+    def __init__(self, hex_array, config, gen_graph = True):
         self.hex_array = hex_array
 
         modelname = config['Retina']['model']
@@ -82,7 +82,8 @@ class RetinaArray(object):
         acc_factor = config['Retina']['acceptance_factor']
         self.acceptance_angle = self.interommatidial_angle * acc_factor
 
-        self._generate_graph()
+        if gen_graph:
+            self._generate_graph()
 
     def _set_elements(self):
         self._ommatidia = [Ommatidium(el)

@@ -71,7 +71,7 @@ class PhotoreceptorModel(BaseMembraneModel):
         
         # setup RNG
         self.randState = curand.curand_setup(
-            self.block_transduction[0]*self.num_neurons, seed)
+            self.block_transduction[0]*self.grid_transduction[0], seed)
     
         # using microvilli as single unite in the transduction kernel
         # therefore, we need to figure out which neuron each microvillus
@@ -158,6 +158,7 @@ class PhotoreceptorModel(BaseMembraneModel):
         if self.params_dict['pre']['I'].size > 0:
             self.sum_in_variable('I', self.I_fb)
         
+        # what if no input processor is provided?
         self.re_sort_func.prepared_async_call(
                 self.grid_re_sort, self.block_re_sort, st,
                 self.access_buffers['photon'].gpudata,
@@ -177,7 +178,7 @@ class PhotoreceptorModel(BaseMembraneModel):
         
             # reset warp counter
             self.count.fill(0)
-        
+            
             # X, V, ns, photons -> X
             self.transduction_func.prepared_async_call(
                 self.grid_transduction, self.block_transduction, st,
@@ -186,23 +187,23 @@ class PhotoreceptorModel(BaseMembraneModel):
                 self.photons.gpudata,
                 self.d_num_microvilli.gpudata,
                 self.total_microvilli, self.count.gpudata)
-            
+                
             # X, V, I_fb -> I
-            self.sum_current_func.prepared_call(
-                self.grid_sum, self.block_sum,
+            self.sum_current_func.prepared_async_call(
+                self.grid_sum, self.block_sum, st,
                 self.X[2].gpudata, self.d_num_microvilli.gpudata,
                 self.d_cum_microvilli.gpudata,
                 update_pointers['V'], self.I.gpudata, self.I_fb.gpudata)
                 
             # hhX, I -> hhX, V
-            self.hh_func.prepared_call(
-                self.grid_hh, self.block_hh,
+            self.hh_func.prepared_async_call(
+                self.grid_hh, self.block_hh, st,
                 self.I.gpudata, update_pointers['V'], self.hhx[0].gpudata,
                 self.hhx[1].gpudata, self.hhx[2].gpudata, self.hhx[3].gpudata,
                 self.hhx[4].gpudata, self.num_neurons, self.run_dt/10, 10)
 
-            self.update_ns_func.prepared_call(
-                ( (self.num_neurons - 1) / 128 + 1, 1), (128, 1, 1),
+            self.update_ns_func.prepared_async_call(
+                ( (self.num_neurons - 1) / 128 + 1, 1), (128, 1, 1), st,
                 self.ns.gpudata, self.num_neurons, update_pointers['V'], self.run_dt)
     
 
@@ -402,7 +403,8 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
     float sumrate, dt_advanced;
     int reaction_ind;
     ushort2 tmp;
-
+    
+    
     // copy random generator state locally to avoid accessing global memory
     curandStateXORWOW_t localstate = state[gid];
 
@@ -417,6 +419,7 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
     }
     mid = mi + wid;
     int mid;
+    
     
     while(mid < total_microvilli)
     {
@@ -606,8 +609,10 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
         }
         mid = mi + wid;
     }
+    
     // copy the updated random generator state back to global memory
     state[gid] = localstate;
+    
 }
 
 }
@@ -700,7 +705,6 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
     while(mid < total_microvilli)
     {
         ind = ((ushort*)d_X[4])[mid];
-        
         // load variables that are needed for computing calcium concentration
         tmp = ((ushort2*)d_X[2])[mid];
         X[tid][5] = tmp.x;
@@ -713,7 +717,7 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
         Ca[tid] = compute_ca(X[tid][6], num_to_mM(X[tid][5]), Vm);
         fn[tid] = compute_fn( num_to_mM(X[tid][5]), ns);
         
-        lambda = input[ind]/num_microvilli[ind];
+        lambda = input[ind]/(double)num_microvilli[ind];
 
         // load the rest of variables
         tmp = ((ushort2*)d_X[1])[mid];
@@ -815,7 +819,7 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
                     }
                 }
             }
-            int ind;
+            //int ind;
 
             // only up to two state variables are needed to be updated
             // update the first one.
