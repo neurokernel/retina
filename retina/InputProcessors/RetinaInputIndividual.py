@@ -10,7 +10,7 @@ import pycuda.driver as cuda
 from neurokernel.LPU.InputProcessors.BaseInputProcessor import BaseInputProcessor
 
 class RetinaInputIndividual(BaseInputProcessor):
-    def __init__(self, config, photoreceptor_list):
+    def __init__(self, config, photoreceptor_list, user_id = ''):
         """
         config: see retina configuration template
         
@@ -30,6 +30,7 @@ class RetinaInputIndividual(BaseInputProcessor):
         self.pr_list = photoreceptor_list
         self.retina_radius = config['Retina']['radius']
         self.num_photoreceptors = len(photoreceptor_list)
+        self.user_id = user_id
         
         #uids = ['neuron_{}_{}'.format(name, i) for i in range(retina.num_elements)
         #        for name in ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']]
@@ -54,18 +55,20 @@ class RetinaInputIndividual(BaseInputProcessor):
         rfs = self.rfs
         i = 0
         
-        screen.setup_file('intensities{}.h5'.format(i))
-
-        retina_elev_file = 'retina_elev{}.h5'.format(i)
-        retina_azim_file = 'retina_azim{}.h5'.format(i)
-
-        screen_dima_file = 'grid_dima{}.h5'.format(i)
-        screen_dimb_file = 'grid_dimb{}.h5'.format(i)
-
-        retina_dima_file = 'retina_dima{}.h5'.format(i)
-        retina_dimb_file = 'retina_dimb{}.h5'.format(i)
+        user_id = self.user_id
         
-        self.input_file = 'retina_input{}.h5'.format(i)
+        screen.setup_file('intensities{}_{}.h5'.format(i, user_id))
+
+        retina_elev_file = 'retina_elev{}_{}.h5'.format(i, user_id)
+        retina_azim_file = 'retina_azim{}_{}.h5'.format(i, user_id)
+
+        screen_dima_file = 'grid_dima{}_{}.h5'.format(i, user_id)
+        screen_dimb_file = 'grid_dimb{}_{}.h5'.format(i, user_id)
+
+        retina_dima_file = 'retina_dima{}_{}.h5'.format(i, user_id)
+        retina_dimb_file = 'retina_dimb{}_{}.h5'.format(i, user_id)
+        
+        self.input_file = 'retina_input{}_{}.h5'.format(i, user_id)
 
         #elev_v, azim_v = retina.get_ommatidia_pos()
         elev_v = np.array([a[1]['3d_elev'] for a in pr_list])

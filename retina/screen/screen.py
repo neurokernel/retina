@@ -76,9 +76,12 @@ class Screen(object):
             self.read_from_file = True
             self.file_position = 0
         else:
-            self.store_to_file = True
             self.read_from_file = False
             self.skip_step = self.screen_write_step
+            if self.skip_step:
+                self.store_to_file = True
+            else:
+                self.store_to_file = False
             self.step_count = 0
 
     def get_screen_intensity_steps(self, num_steps):
@@ -88,11 +91,12 @@ class Screen(object):
                 self.inputfile = h5py.File(self.filename, 'r')
                 self.inputarray = self.inputfile['/array']
             else:
-                self.outputfile = h5py.File(self.filename, 'w')
-                self.outputfile.create_dataset(
-                    '/array', (0, self._height, self._width),
-                    dtype = self._dtype,
-                    maxshape=(None, self._height, self._width))
+                if self.store_to_file:
+                    self.outputfile = h5py.File(self.filename, 'w')
+                    self.outputfile.create_dataset(
+                        '/array', (0, self._height, self._width),
+                        dtype = self._dtype,
+                        maxshape=(None, self._height, self._width))
             self.file_open = True
         try:
             if self.read_from_file:
