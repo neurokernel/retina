@@ -159,10 +159,10 @@ class RetinaArray(object):
             
             G_neuroarch.add_node('circuit_'+ circuit_name,
                                  {'name': 'Ommatidium',
-                                  '3d_elev': float(sphere_pos[0]),
-                                  '3d_azim': float(sphere_pos[1]),
-                                  '2d_x': float(hx_loc[0]),
-                                  '2d_y': float(hx_loc[1])})
+                                  'elev_3d': float(sphere_pos[0]),
+                                  'azim_3d': float(sphere_pos[1]),
+                                  'x_2d': float(hx_loc[0]),
+                                  'y_2d': float(hx_loc[1])})
                                   
             for name, neuron in omm.neurons.items():
                 direction = neuron.direction
@@ -170,10 +170,10 @@ class RetinaArray(object):
                 G_neuroarch.add_node(neuron.id, neuron.params.copy())
                 G_neuroarch.node[neuron.id].update(
                     {'name': name,
-                     '3d_elev': float(sphere_pos[0]),
-                     '3d_azim': float(sphere_pos[1]),
-                     '2d_x': float(hx_loc[0]),
-                     '2d_y': float(hx_loc[1]),
+                     'elev_3d': float(sphere_pos[0]),
+                     'azim_3d': float(sphere_pos[1]),
+                     'x_2d': float(hx_loc[0]),
+                     'y_2d': float(hx_loc[1]),
                      'genetic.neurotransmitter': 'histamine',
                      'optic_axis_elev': float(direction[0]),
                      'optic_axis_azim': float(direction[1]),
