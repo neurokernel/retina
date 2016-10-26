@@ -71,8 +71,8 @@ class RetinaInputIndividual(BaseInputProcessor):
         self.input_file = 'retina_input{}_{}.h5'.format(i, user_id)
 
         #elev_v, azim_v = retina.get_ommatidia_pos()
-        elev_v = np.array([a[1]['3d_elev'] for a in pr_list])
-        azim_v = np.array([a[1]['3d_azim'] for a in pr_list])
+        elev_v = np.array([a[1]['elev_3d'] for a in pr_list])
+        azim_v = np.array([a[1]['azim_3d'] for a in pr_list])
 
         for data, filename in [(elev_v, retina_elev_file),
                                (azim_v, retina_azim_file),
@@ -97,8 +97,8 @@ class RetinaInputIndividual(BaseInputProcessor):
         mapdr_cls = cls_map.get_mapdr_cls(screen_type)
         projection_map = mapdr_cls(self.retina_radius, screen.radius)
         
-        pos_elev = np.array([a[1]['3d_elev'] for a in pr_list])
-        pos_azim = np.array([a[1]['3d_azim'] for a in pr_list])
+        pos_elev = np.array([a[1]['elev_3d'] for a in pr_list])
+        pos_azim = np.array([a[1]['azim_3d'] for a in pr_list])
         dir_elev = np.array([a[1]['optic_axis_elev'] for a in pr_list])
         dir_azim = np.array([a[1]['optic_axis_azim'] for a in pr_list])
 
