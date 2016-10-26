@@ -50,25 +50,26 @@ class RetinaInputIndividual(BaseInputProcessor):
     
     def generate_datafiles(self):
         screen = self.screen
+        config = self.config
         #retina = self.retina
         pr_list = self.pr_list
         rfs = self.rfs
-        i = 0
         
         user_id = self.user_id
         
-        screen.setup_file('intensities{}_{}.h5'.format(i, user_id))
+        screen.setup_file('intensities_{}.h5'.format(user_id))
 
-        retina_elev_file = 'retina_elev{}_{}.h5'.format(i, user_id)
-        retina_azim_file = 'retina_azim{}_{}.h5'.format(i, user_id)
+        retina_elev_file = 'retina_elev_{}.h5'.format(user_id)
+        retina_azim_file = 'retina_azim_{}.h5'.format(user_id)
 
-        screen_dima_file = 'grid_dima{}_{}.h5'.format(i, user_id)
-        screen_dimb_file = 'grid_dimb{}_{}.h5'.format(i, user_id)
+        screen_dima_file = 'grid_dima_{}.h5'.format(user_id)
+        screen_dimb_file = 'grid_dimb_{}.h5'.format(user_id)
 
-        retina_dima_file = 'retina_dima{}_{}.h5'.format(i, user_id)
-        retina_dimb_file = 'retina_dimb{}_{}.h5'.format(i, user_id)
+        retina_dima_file = 'retina_dima_{}.h5'.format(user_id)
+        retina_dimb_file = 'retina_dimb_{}.h5'.format(user_id)
         
-        self.input_file = 'retina_input{}_{}.h5'.format(i, user_id)
+        self.input_file = '{}_{}.h5'.format(
+                                config['Retina']['input_file'], user_id)
 
         #elev_v, azim_v = retina.get_ommatidia_pos()
         elev_v = np.array([a[1]['elev_3d'] for a in pr_list])

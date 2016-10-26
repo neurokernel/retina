@@ -38,21 +38,21 @@ class RetinaInputProcessor(BaseInputProcessor):
     def generate_datafiles(self):
         screen = self.screen
         retina = self.retina
+        config = self.config
         rfs = self.rfs
-        i = 0
         
-        screen.setup_file('intensities{}.h5'.format(i))
+        screen.setup_file('intensities.h5')
 
-        retina_elev_file = 'retina_elev{}.h5'.format(i)
-        retina_azim_file = 'retina_azim{}.h5'.format(i)
+        retina_elev_file = 'retina_elev.h5'
+        retina_azim_file = 'retina_azim.h5'
 
-        screen_dima_file = 'grid_dima{}.h5'.format(i)
-        screen_dimb_file = 'grid_dimb{}.h5'.format(i)
+        screen_dima_file = 'grid_dima.h5'
+        screen_dimb_file = 'grid_dimb.h5'
 
-        retina_dima_file = 'retina_dima{}.h5'.format(i)
-        retina_dimb_file = 'retina_dimb{}.h5'.format(i)
+        retina_dima_file = 'retina_dima.h5'
+        retina_dimb_file = 'retina_dimb.h5'
         
-        self.input_file = 'retina_input{}.h5'.format(i)
+        self.input_file = '{}.h5'.format(config['Retina']['input_file'])
 
         elev_v, azim_v = retina.get_ommatidia_pos()
 
