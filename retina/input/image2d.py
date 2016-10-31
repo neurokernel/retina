@@ -164,6 +164,50 @@ class FlickerStep(Image2D):
         return im
 
 
+class Gratings(Image2D):
+    def __init__(self, config):
+        super(Gratings, self).__init__(config)
+
+        input_config = self.get_input_config(config)
+        self.set_parameters(input_config)
+
+    def set_parameters(self, config):
+        self.x_freq = config['x_freq']
+        self.y_freq = config['y_freq']
+        self.x_speed = config['x_speed']
+        self.y_speed = config['y_speed']
+        self.sinusoidal = config['sinusoidal']
+        self.levels = tuple(config['levels'])
+        self.reset()
+
+    def _generate_2dimage_step(self, step):
+        dt = self.dt
+        levels = self.levels
+        shape = self.shape
+        x_freq = self.x_freq
+        y_freq = self.y_freq
+        x_speed = self.x_speed
+        y_speed = self.y_speed
+        sinusoidal = self.sinusoidal
+
+        x, y = np.meshgrid(np.arange(float(shape[1])),
+                           np.arange(float(shape[0])))
+
+        if sinusoidal:
+            sinfunc = lambda w: ((np.sin(w)+1)/2)*(levels[1]-levels[0]) \
+                + levels[0]
+        else:
+            sinfunc = lambda w: np.sign(np.cos(w))*((levels[1]-levels[0])/2) \
+                + (levels[1]+levels[0])/2
+
+        return sinfunc(x_freq*2*np.pi*(x - x_speed*step*dt) +
+                       y_freq*2*np.pi*(y - y_speed*step*dt))
+
+    def get_config(self):
+        return self.get_config_from_params(['x_freq', 'y_freq', 'x_speed',
+                                            'y_speed', 'sinusoidal', 'levels'])
+
+
 class Natural(Image2D):
     def __init__(self, config):
         super(Natural, self).__init__(config)
