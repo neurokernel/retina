@@ -29,11 +29,19 @@ class RetinaInputProcessor(BaseInputProcessor):
         self.generate_receptive_fields()
         self.generate_datafiles()
         self.input_file_handle = h5py.File(self.input_file, 'w')
+        self.input_file_handle.create_dataset('metadata', (), 'i')
+        self.input_file_handle['metadata'].attrs['dt'] = self.config['General']['dt']
+        self.input_file_handle['metadata'].attrs['screentype'] = self.config['Retina']['screentype']
+        self.input_file_handle['metadata'].attrs['rings'] = self.config['Retina']['rings']
+        self.input_file_handle['metadata'].attrs['dt'] = self.config['Retina']['intype']
         self.input_file_handle.create_dataset(
-                    '/array',
-                    (0, self.retina.num_photoreceptors),
-                    dtype=np.float64,
-                    maxshape=(None, self.retina.num_photoreceptors))
+                'photon/data',
+                (0, self.retina.num_photoreceptors),
+                dtype=np.float64,
+                maxshape=(None, self.retina.num_photoreceptors))
+        self.input_file_handle.create_dataset(
+                'photon/uids',
+                data=np.array(self.variables['photon']['uids']))
     
     def generate_datafiles(self):
         screen = self.screen
@@ -96,9 +104,11 @@ class RetinaInputProcessor(BaseInputProcessor):
     def update_input(self):
         im = self.screen.get_screen_intensity_steps(1)
         # reshape neede for inputs in order to write file to an array
-        inputs = self.rfs.filter_image_use(im).get().reshape((1,-1))
-        dataset_append(self.input_file_handle['/array'],
-                       inputs)
+        inputs = self.rfs.filter_image_use(im).get().reshape((-1))
+        self.input_file_handle['photon/data'].resize(
+            (self.input_file_handle['photon/data'].shape[0]+1,
+             len(self.variables['photon']['uids'])))
+        self.input_file_handle['photon/data'][-1,:] = inputs
         self.variables['photon']['input'][:] = inputs
                          
     

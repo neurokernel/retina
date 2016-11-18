@@ -16,6 +16,7 @@ import retina.retina as ret
 import retina.geometry.hexagon as hx
 
 from retina.InputProcessors.RetinaInputProcessor import RetinaInputProcessor
+from neurokernel.LPU.InputProcessors.FileInputProcessor import FileInputProcessor
 from neurokernel.LPU.OutputProcessors.FileOutputProcessor import FileOutputProcessor
 from retina.screen.map.mapimpl import AlbersProjectionMap
 from retina.configreader import ConfigReader
@@ -62,14 +63,13 @@ def add_retina_LPU(config, i, retina, manager):
 
     inputmethod = config['Retina']['inputmethod']
     if inputmethod == 'read':
-        print('Generating input files')
-        with Timer('input generation'):
-            input_processor = RetinaFileInputProcessor(config, retina)
+        print 'Reading from previously generated input'
+        print 'The configuration must stay the same.'
+        input_processor = FileInputProcessor('{}.h5'.format(config['Retina']['input_file']))
     else:
-        print('Using input generating function')
+        print 'Using input generating function'
         input_processor = RetinaInputProcessor(config, retina)
 
-    input_processor = get_input_gen(config, retina)
     output_processor = FileOutputProcessor([('V',None)], output_file, sample_interval=1)
 
     G = retina.get_worker_nomaster_graph()
@@ -116,17 +116,6 @@ def change_config(config, index):
         index %= len(values)
         config['General']['file_suffix'] = suffixes[index]
         config['Retina']['worker_num'] = values[index]
-
-def get_input_gen(config, retina):
-    inputmethod = config['Retina']['inputmethod']
-
-    if inputmethod == 'read':
-        print('Generating input files')
-        raise Error("Read from file not supported")
-    else:
-        print('Using input generating function')
-
-        return RetinaInputProcessor(config, retina)
 
 
 def get_config_obj(args):
