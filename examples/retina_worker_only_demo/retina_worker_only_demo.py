@@ -14,13 +14,13 @@ from neurokernel.LPU.LPU import LPU
 
 import retina.retina as ret
 import retina.geometry.hexagon as hx
-import gen_input as gi
 
 from retina.InputProcessors.RetinaInputProcessor import RetinaInputProcessor
 from neurokernel.LPU.OutputProcessors.FileOutputProcessor import FileOutputProcessor
 from retina.screen.map.mapimpl import AlbersProjectionMap
 from retina.configreader import ConfigReader
-from retina.NDComponents.MembraneModels.Photoreceptor import Photoreceptor
+from retina.NDComponents.MembraneModels.PhotoreceptorModel import PhotoreceptorModel
+from retina.NDComponents.MembraneModels.BufferPhoton import BufferPhoton
 
 dtype = np.double
 RECURSION_LIMIT = 80000
@@ -75,10 +75,10 @@ def add_retina_LPU(config, i, retina, manager):
     G = retina.get_worker_nomaster_graph()
     nx.write_gexf(G, gexf_file)
 
-    (comp_dict, conns) = LPU.lpu_parser_legacy(gexf_file)
+    (comp_dict, conns) = LPU.graph_to_dicts(G)
     retina_id = get_retina_id(i)
 
-    extra_comps = [Photoreceptor]
+    extra_comps = [PhotoreceptorModel, BufferPhoton]
 
     manager.add(LPU, retina_id, dt, comp_dict, conns,
                 device = i, input_processors = [input_processor],
@@ -122,9 +122,7 @@ def get_input_gen(config, retina):
 
     if inputmethod == 'read':
         print('Generating input files')
-        with Timer('input generation'):
-            gi.gen_input(config)
-        return None
+        raise Error("Read from file not supported")
     else:
         print('Using input generating function')
 
