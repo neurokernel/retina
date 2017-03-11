@@ -194,42 +194,6 @@ class RetinaArray(object):
                      'selector': '/ret/{}/{}_agg'.format(i,name)})
                 G_neuroarch.add_edge(neuron.id+'_aggregator_port', neuron.id,
                                      variable = 'I')
-    
-
-#        if G_lamina is None:
-#            return G_neuroarch
-#            
-#        all_edge_going_to_retina = [edge for edge in G_lamina.edges() \
-#                    if edge[1].startswith('neuron_R')]
-#        
-#        num_synapses = 0
-#
-#        for edge in all_edge_going_to_retina:
-#            synapse = edge[0]
-#            # find the in neuron
-#            pre_neuron = G_lamina.in_edges(synapse)[0][0]
-#            # find the port associated with the pre_neuron
-#            pre_neuron_port = [tmp for tmp in G_lamina.out_edges(pre_neuron) \
-#                               if tmp[1].endswith('port')][0][1]
-#            # create the input port node if it does not exist
-#            if not G_neuroarch.has_node(pre_neuron_port):
-#                neuron = G.node['neuron_Am_186_port']
-#                sel = '/'.join(['/ret']+neuron['selector'].split('/')[2:])
-#                G_neuroarch.add_node(pre_neuron_port,
-#                                     {'circuit': neuron['circuit'],
-#                                      'class': 'Port',
-#                                      'name': pre_neuron_port,
-#                                      'port_io': 'in',
-#                                      'port_type': neuron['port_type'],
-#                                      'selector': sel})
-#            # create synapse node
-#            new_synapse_id = 'synapse_{}'.format(num_synapses)
-#            G_neuroarch.add_node(synapse,
-#                                 G_lamina.node[synapse])
-#
-#
-#
-#            num_synapses += 1
 
         return G_neuroarch
 
@@ -276,8 +240,6 @@ class RetinaArray(object):
                 if OpticAxisRule.is_photor(name):
                     ind = OpticAxisRule.name_to_ind(name)
                     G_workers.add_node(neuron.id, neuron.params.copy())
-#                    G_workers.node[neuron.id].update(
-#                        {'selector': '/retina_worker/{}/R{}'.format(i, ind)})
 
                     self.worker_comp_list.append(neuron.id)
                     G_workers.add_node(neuron.id+'_in', {
@@ -369,17 +331,6 @@ class RetinaArray(object):
                                       variable = 'I')
                     
                     num_m += 1
-
-#        num = 0
-#        for omm in self._ommatidia:
-#            for neuron in omm.neurons.itervalues():
-#                for synapse in neuron.outgoing_synapses:
-#                    synapse.params.update({'id': num})
-#                    synapse.process_before_export()
-#                    G_workers_nomaster.add_edge(synapse.pre_neuron.num,
-#                               synapse.post_neuron.num,
-#                               attr_dict=synapse.params.copy())
-#                    num += 1
 
         self.G_master = G_master
         self.G_workers = G_workers
