@@ -14,7 +14,7 @@ from setuptools import setup
 
 
 NAME =               'neurokernel-retina'
-VERSION =            '1.0'
+VERSION =            '1.1'
 AUTHOR =             'Neurokernel Development Team'
 AUTHOR_EMAIL =       'neurokernel-dev@columbia.edu'
 URL =                'https://github.com/neurokernel/retina'
