@@ -411,16 +411,14 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
 
 
     int mid; // microvilli ID
-    __shared__ volatile int mi; // starting point of mid per ward
+    volatile __shared__ int mi[4]; // starting point of mid per ward
     
     // use atomicAdd to obtain the starting mid for the warp
     if(wid == 0)
     {
-        mi = atomicAdd(count, 32);
+        mi[wrp] = atomicAdd(count, 32);
     }
-    mid = mi + wid;
-    int mid;
-    
+    mid = mi[wrp] + wid;
     
     while(mid < total_microvilli)
     {
@@ -606,9 +604,9 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
         
         if(wid == 0)
         {
-            mi = atomicAdd(count, 32);
+            mi[wrp] = atomicAdd(count, 32);
         }
-        mid = mi + wid;
+        mid = mi[wrp] + wid;
     }
     
     // copy the updated random generator state back to global memory
@@ -677,6 +675,7 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
     int tid = threadIdx.x;
     int gid = threadIdx.x + blockIdx.x * blockDim.x;
     int wid = tid %% 32;
+    int wrp = tid >> 5;
 
     __shared__ int X[BLOCK_SIZE][7];  // number of molecules
     __shared__ float Ca[BLOCK_SIZE];
@@ -701,7 +700,6 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
         mi[wrp] = atomicAdd(count, 32);
     }
     mid = mi[wrp] + wid;
-    int ind;
 
     while(mid < total_microvilli)
     {
@@ -1023,10 +1021,10 @@ sum_current(ushort2* d_Tstar, int* d_num_microvilli,
 
     if (tid < 64) {
         #pragma unroll
-        for(int i = 0; i < BLOCK_SIZE/64; ++i)
-            sum[tid] += sum[tid + 32*i];
-        __syncthreads();
+        for(int i = 1; i < BLOCK_SIZE/64; ++i)
+            sum[tid] += sum[tid + 64*i];
     }
+    __syncthreads();
 
     if (tid < 32) total_open_channel = warpReduction(sum, tid);
     
