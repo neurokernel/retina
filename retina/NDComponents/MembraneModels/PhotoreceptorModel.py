@@ -419,6 +419,7 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
         mi[wrp] = atomicAdd(count, 32);
     }
     mid = mi[wrp] + wid;
+    int ind;
     
     while(mid < total_microvilli)
     {
@@ -700,6 +701,7 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
         mi[wrp] = atomicAdd(count, 32);
     }
     mid = mi[wrp] + wid;
+    int ind;
 
     while(mid < total_microvilli)
     {
