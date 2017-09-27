@@ -62,11 +62,11 @@ class RetinaArray(object):
         self.hex_array = hex_array
 
         modelname = config['Retina']['model']
-        try:
-            self.model = importlib.import_module('vision_models.{}'
-                                                 .format(modelname))
-        except ImportError:
-            self.model = importlib.import_module('retina.vision_models.{}'
+        #try:
+        #    self.model = importlib.import_module('vision_models.{}'
+        #                                         .format(modelname))
+        #except ImportError:
+        self.model = importlib.import_module('retina.vision_models.{}'
                                                  .format(modelname))
 
         self.opticaxis = opticaxisFactory('SuperpositionLT')()
