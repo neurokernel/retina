@@ -10,11 +10,13 @@ import networkx as nx
 import neurokernel.core_gpu as core
 from neurokernel.tools.logging import setup_logger
 from neurokernel.tools.timing import Timer
+from neurokernel.LPU.LPU import LPU
+from neurokernel.LPU.InputProcessors.StepInputProcessor import StepInputProcessor
+from neurokernel.LPU.OutputProcessors.FileOutputProcessor import FileOutputProcessor
 
-import gen_input as gi
-
-from retina.LPU import LPU
 from retina.configreader import ConfigReader
+from retina.NDComponents.MembraneModels.PhotoreceptorModel import PhotoreceptorModel
+
 
 dtype = np.double
 
@@ -39,17 +41,15 @@ def generate_gexf(config, output_file):
 
     for i in range(photoreceptors):
         G.node[i] = {
-            'model': 'Photoreceptor',
+            'class': 'PhotoreceptorModel',
             'name': 'photoreceptor{}'.format(i),
-            'extern': True,  # gets input from file
-            'public': True,   # it's an output neuron
-            'spiking': False,
             'selector': '/photor{}'.format(i),
-            'num_microvilli': micro
+            'num_microvilli': micro,
+            'init_V': -81.99, 'init_sa': 0.2184, 'init_si': 0.9653,
+            'init_dra': 0.0117, 'init_dri': 0.9998, 'init_nov': 0.0017
         }
 
-    nx.write_gexf(G, output_file)
-
+    return G
 
 def add_LPU(config, manager):
     config_photor = config['Photoreceptor']
@@ -57,18 +57,22 @@ def add_LPU(config, manager):
     input_file = config_photor['input_file']
     output_file = config_photor['output_file']
 
-    generate_gexf(config_photor, gexf_file)
+    G = generate_gexf(config_photor, gexf_file)
 
-    n_dict_ph, s_dict_ph = LPU.lpu_parser(gexf_file)
+    LPU.graph_to_dicts(G)
+    comp_dict, conns = LPU.graph_to_dicts(G)
     LPU_id = 'photoreceptor'
     debug = config_photor['debug']
 
     dt = config['General']['dt']
-    modules = ['retina.neurons.photoreceptor']
-    manager.add(LPU, LPU_id, dt, n_dict_ph, s_dict_ph,
-                input_file=input_file, output_file=output_file,
-                device=0, debug=debug, time_sync=False,
-                modules=modules)
+    extra_comps = [PhotoreceptorModel]
+
+    input_processor = StepInputProcessor('photon', G.nodes(), 10000, 0.2, 1)
+    output_processor = FileOutputProcessor([('V', G.nodes())], output_file, sample_interval=1)
+    manager.add(LPU, LPU_id, dt, comp_dict, conns,
+                device = 0, input_processors = [input_processor],
+                output_processors = [output_processor],
+                debug=debug, time_sync=False, extra_comps = extra_comps)
 
 
 def start_simulation(config, manager):
@@ -155,8 +159,8 @@ def main():
         edit_files(config)
 
     setup_logging(config)
-    with Timer('input generation'):
-        gi.gen_input_norfscreen(config)
+    # with Timer('input generation'):
+    #     gi.gen_input_norfscreen(config)
 
     manager = core.Manager()
     with Timer('photoreceptor instantiation'):
