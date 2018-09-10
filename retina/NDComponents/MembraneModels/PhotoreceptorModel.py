@@ -338,10 +338,10 @@ extern "C" {
 #define TRP_REV         0       /* TRP channel reversal potential (mV) */
 
 __device__ __constant__ long long int d_X[5];
-__device__ __constant__ int change_ind1[13];
-__device__ __constant__ int change1[13];
-__device__ __constant__ int change_ind2[13];
-__device__ __constant__ int change2[13];
+__device__ __constant__ int change_ind1[14];
+__device__ __constant__ int change1[14];
+__device__ __constant__ int change_ind2[14];
+__device__ __constant__ int change2[14];
 
 /* cc = n/(NA*VOL) [6.0221413e+23 mol^-1 * 3*10e-21 m^3] */
 __device__ float num_to_mM(int n)
