@@ -9,8 +9,8 @@ from neurokernel.LPU.utils.simpleio import *
 
 from retina.input.image2d import image2Dfactory
 
-from map.mapimpl import pointmapfactory
-from transform.imagetransform import ImageTransform
+from .map.mapimpl import pointmapfactory
+from .transform.imagetransform import ImageTransform
 
 
 
@@ -118,7 +118,7 @@ class Screen(object):
                     self.step_count %= self.skip_step
                     if self.step_count == 0:
                         dataset_append(self.outputfile['/array'], screens[[0]])
-                    
+
                     self.step_count += num_steps
                     if self.step_count > self.skip_step:
                         dataset_append(self.outputfile['/array'],

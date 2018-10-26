@@ -43,9 +43,8 @@ class ConfigReader(object):
             section_string = ', '.join(section_list)
             if error is False:
                 error = 'Missing value or section.'
-            print section_string, ' = ', error
+            print(section_string, ' = ', error)
 
     @property
     def conf(self):
         return self._conf
-

@@ -239,7 +239,7 @@ class Natural(Image2D):
     def __del__(self):
         try:
             if self.store_coords:
-                print 'closing natural_xy file'
+                print('closing natural_xy file')
                 self.coordfile.close()
         except AttributeError:
             pass
@@ -273,7 +273,7 @@ class Natural(Image2D):
         imagex = self.imagex
         imagey = self.imagey
         margin = self.margin
-        
+
         if not self.file_open:
             if self.store_coords:
                 self.coordfile = h5py.File(self.coord_file_name, 'w')
@@ -454,4 +454,3 @@ def main():
 ''' run as `python -m retina.model.image2d` '''
 if __name__ == '__main__':
     main()
-

@@ -4,7 +4,7 @@ from __future__ import division
 
 import numpy as np
 
-from pointmap import PointMap, EyeToImagePointMap
+from .pointmap import PointMap, EyeToImagePointMap
 
 PI = np.pi
 MYFLOAT = np.float64
@@ -529,4 +529,3 @@ def pointmapfactory(map_type):
         print('Invalid PointMap subclass name:{}'.format(map_type))
         return None
     return pointmap_cls
-

@@ -1,7 +1,7 @@
-import screen.screen as scr
-import screen.map.mapimpldr as mapdr
-import vrf.vrf as vrf
-import vrf.vrf_no_gpu as vrfn
+from .screen import screen as scr
+from .screen.map import mapimpldr as mapdr
+from .vrf import vrf as vrf
+from .vrf import vrf_no_gpu as vrfn
 
 CYLINDER = 'Cylinder'
 SPHERE = 'Sphere'

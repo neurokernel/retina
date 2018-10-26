@@ -7,7 +7,7 @@ from pycuda.tools import dtype_to_ctype, context_dependent_memoize
 from pycuda.compiler import SourceModule
 
 import skcuda.cublas as cublas
-import parray
+from . import parray
 
 
 """ assuming row major storage as in PitchArray """
@@ -37,7 +37,7 @@ def dot(A, B, opa = 'n', opb = 'n',
     if C is specified, use the memory in C.
     Specified C must have the same leading dimension as that of the result and
     the other dimension must be bigger or equal to that of the result.
-    
+
     Parameters:
     -----------
     A: parray.PitchArray
@@ -62,15 +62,15 @@ def dot(A, B, opa = 'n', opb = 'n',
     Cscale: float
             scaling factor for C
             result will be C = C*Cscale + scale*A*B
-    
+
     Note:
     -----
     works only for CUDA VERSION > 4.0 where handle is introduced.
-    
+
     Will NOT work for complex case when A and B shares overlapping
     memory, but should work if A==B.
     """
-    
+
     if A.dtype != B.dtype:
         raise TypeError("matrix multiplication must have same dtype")
 
@@ -102,10 +102,10 @@ def dot(A, B, opa = 'n', opb = 'n',
 
         if opa in ['c', 'C']:
             opa = 't'
-        
+
     scale = dtype.type(scale)
     Cscale = dtype.type(Cscale)
-    
+
     if dtype == np.float64:
         tp = 'cublas.cublasD'
         complex_type = False
@@ -131,7 +131,7 @@ def dot(A, B, opa = 'n', opb = 'n',
         if C.shape[1] != l:
             raise AttributeError("shape of the provided result array "
                                  + C.shape.__str__()
-                                 + " does not match intended result " 
+                                 + " does not match intended result "
                                  + (m,l).__str__())
         if C.shape[0] < m + Cstart:
             raise AttributeError("shape of the provided result array "
@@ -141,13 +141,13 @@ def dot(A, B, opa = 'n', opb = 'n',
         if C.dtype != dtype:
             raise TypeError("Result array C provided must have "
                             "the same dtype as inputs")
-    
+
     conjA = False
     conjB = False
     conjC = False
-    
+
     sameflag = (A==B)
-    
+
     itemsize = C.dtype.itemsize
     handlestr = "handle.handle"
     if m == 1:
@@ -238,7 +238,7 @@ def dot(A, B, opa = 'n', opb = 'n',
                         func = (tp + "gerc(handle.handle, l, m, scale, "
                                 + "B.gpudata, 1, A.gpudata, 1, "
                                 + "int(C.gpudata)+Cstart*itemsize*C.ld, C.ld)")
-                    
+
                     else:
                         B.conj()
                         conjB = True
@@ -273,7 +273,7 @@ def dot(A, B, opa = 'n', opb = 'n',
                             opa = 'n'
                         else:
                             opa = 't'
-                        
+
                         func = (tp + "gemv(handle.handle, '" + opa + "', "
                                 + "A.shape[1], A.shape[0], scale, A.gpudata, "
                                 + "A.ld, B.gpudata, 1, Cscale, "
@@ -294,7 +294,7 @@ def dot(A, B, opa = 'n', opb = 'n',
                         if opa in ['t', 'T']:
                             opa = 'n'
                         else:
-                            opa = 't' 
+                            opa = 't'
                         func = (tp + "gemv(handle.handle, '" + opa + "', "
                                 + "A.shape[1],  A.shape[0], scale, A.gpudata, "
                                 + "A.ld, B.gpudata, 1, Cscale, int(C.gpudata) "
@@ -308,7 +308,7 @@ def dot(A, B, opa = 'n', opb = 'n',
     if handle is None:
         handle = cublashandle()
     eval(func)
-    
+
     if conjC:
         C.conj()
 

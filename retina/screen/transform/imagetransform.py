@@ -4,7 +4,7 @@ import numpy as np
 
 from scipy.interpolate import RectBivariateSpline
 
-from signaltransform import SignalTransform
+from .signaltransform import SignalTransform
 
 
 class ImageTransform(SignalTransform):
@@ -31,5 +31,3 @@ class ImageTransform(SignalTransform):
 
         f = RectBivariateSpline(ogridy, ogridx, image, kx=1, ky=1)
         return f.ev(ngridy.flatten(), ngridx.flatten()).reshape(ngridx.shape)
-
-

@@ -5,7 +5,7 @@ from __future__ import division
 import numpy as np
 PI = np.pi
 
-from pointmap import PointMapWithDirection
+from .pointmap import PointMapWithDirection
 
 
 def solve_quadratic(a, b, c):
@@ -195,4 +195,3 @@ class SphereToCylinderMap(PointMapWithDirection):
                     map_azim.reshape(result_shape))
         except AttributeError:  # if elev and azim scalars
             return (np.asscalar(map_elev), np.asscalar(map_azim))
-

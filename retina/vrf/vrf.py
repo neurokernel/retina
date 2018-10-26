@@ -10,8 +10,8 @@ import pycuda.driver as cuda
 from pycuda.tools import dtype_to_ctype, context_dependent_memoize
 from pycuda.compiler import SourceModule
 
-import utils.parray as parray
-import utils.linalg as la
+from .utils import parray as parray
+from .utils import linalg as la
 
 
 class RF(object):

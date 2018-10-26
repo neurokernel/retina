@@ -9,7 +9,7 @@ PI = np.pi
 
 from neurokernel.pattern import Pattern
 
-from geometry.opticaxis import opticaxisFactory, RuleHexArrayMap, OpticAxisRule
+from .geometry.opticaxis import opticaxisFactory, RuleHexArrayMap, OpticAxisRule
 
 def divceil(x, y):
     return (x+y-1)//y
@@ -151,19 +151,19 @@ class RetinaArray(object):
     def generate_neuroarch_gexf(self, G_lamina = None):
         G_neuroarch = nx.MultiDiGraph()
         hex_loc = self.hex_array.hex_loc
-        
+
         for i, omm in enumerate(self._ommatidia):
             sphere_pos = omm.sphere_pos
             hx_loc = hex_loc[i]
             circuit_name = 'ommatidium_{}'.format(i)
-            
+
             G_neuroarch.add_node('circuit_'+ circuit_name,
                                  {'name': 'Ommatidium',
                                   'elev_3d': float(sphere_pos[0]),
                                   'azim_3d': float(sphere_pos[1]),
                                   'x_2d': float(hx_loc[0]),
                                   'y_2d': float(hx_loc[1])})
-                                  
+
             for name, neuron in omm.neurons.items():
                 direction = neuron.direction
                 neuron.id = 'neuron_{}_{}'.format(name, i)
@@ -201,7 +201,7 @@ class RetinaArray(object):
         G_master = nx.DiGraph()
         G_workers = nx.DiGraph()
         G_workers_nomaster = nx.DiGraph()
-        
+
         self.worker_comp_list = []
 
         num_photoreceptors = self.num_photoreceptors
@@ -209,7 +209,7 @@ class RetinaArray(object):
         num_w1 = 0  # workers no master counter
         num_w2 = 0  # workers counter
         num_m = 0
-        
+
         for i, omm in enumerate(self._ommatidia):
             for name, neuron in omm.neurons.items():
                 neuron.id = 'neuron_{}_{}'.format(name, i)
@@ -304,7 +304,7 @@ class RetinaArray(object):
                     G_master.add_edge(neuron.id+'_photon', neuron.id+'_photon_out')
                     G_master.add_edge(neuron.id+'_buff_in', neuron.id)
                     G_master.add_edge(neuron.id, neuron.id+'_out')
-                    
+
                     G_master.add_node(neuron.id+'_aggregator_out', {
                         'class': 'Port',
                         'port_type': 'gpot',
@@ -329,7 +329,7 @@ class RetinaArray(object):
                     G_master.add_edge(neuron.id+'_buff_current',
                                       neuron.id+'aggregator_out',
                                       variable = 'I')
-                    
+
                     num_m += 1
 
         self.G_master = G_master
@@ -356,10 +356,10 @@ class RetinaArray(object):
 
     def update_pattern_master_worker(self, j, worker_num):
         indexes = self.get_worker_nodes(j, worker_num)
-        
+
         master_selectors = self.get_master_selectors()
         worker_selectors = self.get_worker_selectors(j, worker_num)
-        
+
         from_list = []
         to_list = []
 
@@ -370,12 +370,12 @@ class RetinaArray(object):
             dest = '/retina_worker/{}/in_R{}'.format(col_m, ind_m)
             from_list.append(src)
             to_list.append(dest)
-            
+
             src = '/retina_worker/{}/out_R{}'.format(col_m, ind_m)
             dest = '/retina_master/{}/in_R{}'.format(col_m, ind_m)
             from_list.append(src)
             to_list.append(dest)
-        
+
             src = '/retina_master/{}/agg_R{}'.format(col_m, ind_m)
             dest = '/retina_worker/{}/agg_R{}'.format(col_m, ind_m)
             from_list.append(src)
@@ -446,7 +446,7 @@ class RetinaArray(object):
     def get_worker_nodes(self, j, sublpu_num):
         # numbering starts from 1
         return list(range(*self.get_worker_interval(j, sublpu_num)))
-    
+
     def get_worker_nodes_id(self, j, sublpu_num):
         # numbering starts from 1
         return self.worker_comp_list(range(*self.get_worker_interval(j, sublpu_num)))
