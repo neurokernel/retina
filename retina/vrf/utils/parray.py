@@ -269,7 +269,7 @@ class PitchArray(object):
                     self.gpudata, pitch = cuda.mem_alloc_pitch(
                         int(_pd(self.shape) * np.dtype(dtype).itemsize),
                         self.shape[0], np.dtype(dtype).itemsize)
-                    self.ld = pitch / np.dtype(dtype).itemsize
+                    self.ld = pitch // np.dtype(dtype).itemsize
                     self.mem_size = self.ld * self.shape[0]
                     self.M = self.shape[0]
                     self.N = _pd(self.shape)
@@ -298,14 +298,14 @@ class PitchArray(object):
                         pitch = int(np.ceil(
                                 float(_pd(self.shape)
                                 * np.dtype(dtype).itemsize)
-                                / 512) * 512)
+                                // 512) * 512)
                     else:
                         assert pitch == int(np.ceil(
                                         float(_pd(self.shape)
                                         * np.dtype(dtype).itemsize)
-                                        / 512) * 512)
+                                        // 512) * 512)
 
-                    self.ld = pitch / np.dtype(dtype).itemsize
+                    self.ld = pitch // np.dtype(dtype).itemsize
                     self.mem_size = self.ld * self.shape[0]
                     self.M = self.shape[0]
                     self.N = _pd(self.shape)
