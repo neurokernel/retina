@@ -40,7 +40,7 @@ class PhotoreceptorModel(BaseMembraneModel):
         self.block_re_sort = (256, 1, 1)
         self.grid_re_sort = (cuda.Context.get_device().MULTIPROCESSOR_COUNT*5, 1)
         self.block_hh = (256, 1, 1)
-        self.grid_hh = ((self.num_neurons-1.)//self.block_hh[0] + 1, 1)
+        self.grid_hh = ((self.num_neurons-1)//self.block_hh[0] + 1, 1)
         self.block_state = (32, 32, 1)
         self.grid_state = ((self.num_neurons-1)//self.block_state[0] + 1, 1)
 
