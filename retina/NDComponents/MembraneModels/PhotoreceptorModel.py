@@ -17,7 +17,7 @@ class PhotoreceptorModel(BaseMembraneModel):
                  debug=False, cuda_verbose = False):
         self.num_microvilli = params_dict['num_microvilli'].get().astype(np.int32)
         self.num_neurons = self.num_microvilli.size
-        
+
         self.dt = dt
         self.run_dt = 1e-4
 
@@ -40,9 +40,9 @@ class PhotoreceptorModel(BaseMembraneModel):
         self.block_re_sort = (256, 1, 1)
         self.grid_re_sort = (cuda.Context.get_device().MULTIPROCESSOR_COUNT*5, 1)
         self.block_hh = (256, 1, 1)
-        self.grid_hh = ((self.num_neurons-1)/self.block_hh[0] + 1, 1)
+        self.grid_hh = ((self.num_neurons-1.)//self.block_hh[0] + 1, 1)
         self.block_state = (32, 32, 1)
-        self.grid_state = ((self.num_neurons-1)/self.block_state[0] + 1, 1)
+        self.grid_state = ((self.num_neurons-1)//self.block_state[0] + 1, 1)
 
         self.params_dict = params_dict
         self.access_buffers = access_buffers
@@ -57,7 +57,7 @@ class PhotoreceptorModel(BaseMembraneModel):
         self._setup_output()
         self._setup_transduction()
         self._setup_hh()
-    
+
     def _setup_output(self):
         outputfile = self.LPU_id + '_out'
         if self.record_neuron:
@@ -68,11 +68,11 @@ class PhotoreceptorModel(BaseMembraneModel):
 
     def _setup_transduction(self, seed = 0):
         self.photons = garray.zeros(self.num_neurons, self.dtype)
-        
+
         # setup RNG
         self.randState = curand.curand_setup(
             self.block_transduction[0]*self.grid_transduction[0], seed)
-    
+
         # using microvilli as single unite in the transduction kernel
         # therefore, we need to figure out which neuron each microvillus
         # belongs to, and from where to where we should sum up the current.
@@ -83,9 +83,9 @@ class PhotoreceptorModel(BaseMembraneModel):
         self.microvilli_ind = np.cumsum(tmp).astype(np.uint16)
         #self.d_num_microvilli = garray.to_gpu(self.num_microvilli)
         self.d_num_microvilli = self.params_dict['num_microvilli']
-        
+
         self.count = garray.empty(1, np.int32)
-        
+
         self.d_cum_microvilli = garray.to_gpu(self.cum_microvilli.astype(np.int32))
         self.d_microvilli_ind = garray.to_gpu(self.microvilli_ind.astype(np.uint16))
 
@@ -123,7 +123,7 @@ class PhotoreceptorModel(BaseMembraneModel):
             self.dtype, self.block_transduction[0], Xaddress,
             change_ind1, change_ind2,
             change1, change2, self.compile_options)
-        
+
         self.re_sort_func = get_re_sort_func(
             self.dtype, self.compile_options)
 
@@ -133,7 +133,7 @@ class PhotoreceptorModel(BaseMembraneModel):
     def _setup_hh(self):
         self.I = garray.zeros(self.num_neurons, self.dtype)
         self.I_fb = garray.zeros(self.num_neurons, self.dtype)
-        
+
         self.hhx = [garray.empty(self.num_neurons, self.dtype)
                     for _ in range(5)]
 
@@ -157,7 +157,7 @@ class PhotoreceptorModel(BaseMembraneModel):
         self.I_fb.fill(0)
         if self.params_dict['pre']['I'].size > 0:
             self.sum_in_variable('I', self.I_fb)
-        
+
         # what if no input processor is provided?
         self.re_sort_func.prepared_async_call(
                 self.grid_re_sort, self.block_re_sort, st,
@@ -167,7 +167,7 @@ class PhotoreceptorModel(BaseMembraneModel):
                 self.params_dict['npre']['photon'].gpudata,
                 self.params_dict['cumpre']['photon'].gpudata,
                 self.num_neurons)
-        
+
         for _ in range(self.multiple):
             if self.debug:
                 minimum = min(self.photons.get())
@@ -175,10 +175,10 @@ class PhotoreceptorModel(BaseMembraneModel):
                     raise ValueError('Inputs to photoreceptor should not '
                                      'be negative, minimum value detected: {}'
                                      .format(minimum))
-        
+
             # reset warp counter
             self.count.fill(0)
-            
+
             # X, V, ns, photons -> X
             self.transduction_func.prepared_async_call(
                 self.grid_transduction, self.block_transduction, st,
@@ -187,14 +187,14 @@ class PhotoreceptorModel(BaseMembraneModel):
                 self.photons.gpudata,
                 self.d_num_microvilli.gpudata,
                 self.total_microvilli, self.count.gpudata)
-                
+
             # X, V, I_fb -> I
             self.sum_current_func.prepared_async_call(
                 self.grid_sum, self.block_sum, st,
                 self.X[2].gpudata, self.d_num_microvilli.gpudata,
                 self.d_cum_microvilli.gpudata,
                 update_pointers['V'], self.I.gpudata, self.I_fb.gpudata)
-                
+
             # hhX, I -> hhX, V
             self.hh_func.prepared_async_call(
                 self.grid_hh, self.block_hh, st,
@@ -203,9 +203,9 @@ class PhotoreceptorModel(BaseMembraneModel):
                 self.hhx[4].gpudata, self.num_neurons, self.run_dt/10, 10)
 
             self.update_ns_func.prepared_async_call(
-                ( (self.num_neurons - 1) / 128 + 1, 1), (128, 1, 1), st,
+                ( (self.num_neurons - 1) // 128 + 1, 1), (128, 1, 1), st,
                 self.ns.gpudata, self.num_neurons, update_pointers['V'], self.run_dt)
-    
+
 
 
 def get_update_ns_func(dtype, compile_options):
@@ -398,21 +398,21 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
     __shared__ int X[BLOCK_SIZE][7];  // number of molecules
     __shared__ float Ca[BLOCK_SIZE];
     __shared__ float fn[BLOCK_SIZE];
-    
+
     float Vm, ns, lambda;
 
     float sumrate, dt_advanced;
     int reaction_ind;
     ushort2 tmp;
-    
-    
+
+
     // copy random generator state locally to avoid accessing global memory
     curandStateXORWOW_t localstate = state[gid];
 
 
     int mid; // microvilli ID
     volatile __shared__ int mi[4]; // starting point of mid per ward
-    
+
     // use atomicAdd to obtain the starting mid for the warp
     if(wid == 0)
     {
@@ -420,24 +420,24 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
     }
     mid = mi[wrp] + wid;
     int ind;
-    
+
     while(mid < total_microvilli)
     {
         // load photoreceptor index of the microvilli
         ind = ((ushort*)d_X[4])[mid];
-        
+
         // load variables that are needed for computing calcium concentration
         tmp = ((ushort2*)d_X[2])[mid];
         X[tid][5] = tmp.x;
         X[tid][6] = tmp.y;
-        
+
         Vm = d_Vm[ind]*1e-3;
         ns = g_ns[ind];
 
         // update calcium concentration
         Ca[tid] = compute_ca(X[tid][6], num_to_mM(X[tid][5]), Vm);
         fn[tid] = compute_fn(num_to_mM(X[tid][5]), ns);
-        
+
         lambda = input[ind]/num_microvilli[ind];
 
         // load the rest of variables
@@ -602,17 +602,17 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
         ((ushort2*)d_X[0])[mid] = make_ushort2(X[tid][1], X[tid][2]);
         ((ushort2*)d_X[1])[mid] = make_ushort2(X[tid][3], X[tid][4]);
         ((ushort2*)d_X[2])[mid] = make_ushort2(X[tid][5], X[tid][6]);
-        
+
         if(wid == 0)
         {
             mi[wrp] = atomicAdd(count, 32);
         }
         mid = mi[wrp] + wid;
     }
-    
+
     // copy the updated random generator state back to global memory
     state[gid] = localstate;
-    
+
 }
 
 }
@@ -681,7 +681,7 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
     __shared__ int X[BLOCK_SIZE][7];  // number of molecules
     __shared__ float Ca[BLOCK_SIZE];
     __shared__ float fn[BLOCK_SIZE];
-    
+
     float Vm, ns, lambda;
 
     float sumrate, dt_advanced;
@@ -694,7 +694,7 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
 
     int mid; // microvilli ID
     volatile __shared__ int mi[4]; // starting point of mid per ward, blocksize must be 128
-    
+
     // use atomicAdd to obtain the starting mid for the warp
     if(wid == 0)
     {
@@ -710,14 +710,14 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
         tmp = ((ushort2*)d_X[2])[mid];
         X[tid][5] = tmp.x;
         X[tid][6] = tmp.y;
-        
+
         Vm = d_Vm[ind]*1e-3;
         ns = g_ns[ind];
 
         // update calcium concentration
         Ca[tid] = compute_ca(X[tid][6], num_to_mM(X[tid][5]), Vm);
         fn[tid] = compute_fn( num_to_mM(X[tid][5]), ns);
-        
+
         lambda = input[ind]/(double)num_microvilli[ind];
 
         // load the rest of variables
@@ -855,7 +855,7 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
         ((ushort2*)d_X[0])[mid] = make_ushort2(X[tid][1], X[tid][2]);
         ((ushort2*)d_X[1])[mid] = make_ushort2(X[tid][3], X[tid][4]);
         ((ushort2*)d_X[2])[mid] = make_ushort2(X[tid][5], X[tid][6]);
-        
+
         if(wid == 0)
         {
             mi[wrp] = atomicAdd(count, 32);
@@ -872,7 +872,7 @@ transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
         co = [compile_options[0]+' --maxrregcount=54']
     except IndexError:
         co = ['--maxrregcount=54']
-    
+
     scalartype = dtype.type if isinstance(dtype, np.dtype) else dtype
     mod = SourceModule(
         template_run % {
@@ -1008,10 +1008,10 @@ sum_current(ushort2* d_Tstar, int* d_num_microvilli,
 {
     int tid = threadIdx.x;
     int bid = blockIdx.x;
-    
+
     int num_microvilli = d_num_microvilli[bid];
     int shift = d_cum_microvilli[bid];
-    
+
     int total_open_channel;
     __shared__ int sum[BLOCK_SIZE];
     sum[tid] = 0;
@@ -1029,7 +1029,7 @@ sum_current(ushort2* d_Tstar, int* d_num_microvilli,
     __syncthreads();
 
     if (tid < 32) total_open_channel = warpReduction(sum, tid);
-    
+
     if (tid == 0) {
         %(type)s Vm = (d_Vm[bid]-TRP_REV) * 0.001;
         %(type)s I_in;
@@ -1049,4 +1049,3 @@ sum_current(ushort2* d_Tstar, int* d_num_microvilli,
     func = mod.get_function('sum_current')
     func.prepare('PPPPPP')
     return func
-
