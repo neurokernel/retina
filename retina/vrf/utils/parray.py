@@ -135,11 +135,11 @@ def PitchTrans(shape, dst, dst_ld, src, src_ld, dtype, aligned=False,
     ----------
     shape : tuple of ints
         shape of the 2D array to be transferred.
-    dst : { cuda.DeviceAllocation, int, long }
+    dst : { cuda.DeviceAllocation, int}
         pointer to the device memory to be transferred to.
     dst_ld: int
         leading dimension (pitch) of destination.
-    src : { pycuda.driver.DeviceAllocation, int, long }
+    src : { pycuda.driver.DeviceAllocation, int}
         pointer to the device memory to be transferred from.
     src_ld : int
         leading dimension (pitch) of source.
@@ -160,13 +160,13 @@ def PitchTrans(shape, dst, dst_ld, src, src_ld, dtype, aligned=False,
 
     trans = cuda.Memcpy2D()
     trans.src_pitch = src_ld * size
-    if isinstance(src, (cuda.DeviceAllocation, int, long)):
+    if isinstance(src, (cuda.DeviceAllocation, int)):
         trans.set_src_device(src)
     else:
         trans.set_src_host(src)
 
     trans.dst_pitch = dst_ld * size
-    if isinstance(dst, (cuda.DeviceAllocation, int, long)):
+    if isinstance(dst, (cuda.DeviceAllocation, int)):
         trans.set_dst_device(dst)
     else:
         trans.set_dst_host(dst)
