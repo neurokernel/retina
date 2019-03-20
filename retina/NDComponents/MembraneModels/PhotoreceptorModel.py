@@ -629,10 +629,10 @@ extern "C" {
 #define LA 0.5
 
 __device__ __constant__ long long int d_X[5];
-__device__ __constant__ int change_ind1[13];
-__device__ __constant__ int change1[13];
-__device__ __constant__ int change_ind2[13];
-__device__ __constant__ int change2[13];
+__device__ __constant__ int change_ind1[14];
+__device__ __constant__ int change1[14];
+__device__ __constant__ int change_ind2[14];
+__device__ __constant__ int change2[14];
 
 
 __device__ float num_to_mM(int n)
