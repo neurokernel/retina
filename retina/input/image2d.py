@@ -310,8 +310,8 @@ class Natural(Image2D):
                 vy = -vy
 
             # decimal indices are allowed and decimal part is ignored
-            im_v[i] = image[int(round(imagex)):int(round(imagex)) + shape[0],
-                            int(round(imagey)):int(round(imagey)) + shape[1]]
+            im_v[i] = image[int(np.around(imagex)):int(np.around(imagex)) + shape[0],
+                            int(np.around(imagey)):int(np.around(imagey)) + shape[1]]
             xy[i, :] = (imagex, imagey)  # convert to int
 
             # change speed/direction every about 1/dt steps

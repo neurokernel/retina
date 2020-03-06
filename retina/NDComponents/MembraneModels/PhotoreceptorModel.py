@@ -226,7 +226,7 @@ update_ns(%(type)s* g_ns, int num_neurons, %(type)s* V, %(type)s dt)
         if(v >= -53)
             n_inf = 8.5652*(v+53)+5;
         else
-            n_inf = fmax%(fletter)s(1, 0.2354*(v+70)+1);
+            n_inf = fmax%(fletter)s(1.0, 0.2354*(v+70)+1);
 
         g_ns[tid] = ns + (n_inf-ns)*RTAU*dt;
 

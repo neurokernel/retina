@@ -131,7 +131,7 @@ class RetinaArray(object):
 
     def get_all_photoreceptors(self):
         return [photor for ommatidium in self._ommatidia
-                for photor in ommatidium.neurons.itervalues()
+                for photor in ommatidium.neurons.values()
                 if photor.name in ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']]
 
     def get_angle(self):
@@ -158,7 +158,7 @@ class RetinaArray(object):
             circuit_name = 'ommatidium_{}'.format(i)
 
             G_neuroarch.add_node('circuit_'+ circuit_name,
-                                 {'name': 'Ommatidium',
+                                 **{'name': 'Ommatidium',
                                   'elev_3d': float(sphere_pos[0]),
                                   'azim_3d': float(sphere_pos[1]),
                                   'x_2d': float(hx_loc[0]),
@@ -167,7 +167,7 @@ class RetinaArray(object):
             for name, neuron in omm.neurons.items():
                 direction = neuron.direction
                 neuron.id = 'neuron_{}_{}'.format(name, i)
-                G_neuroarch.add_node(neuron.id, neuron.params.copy())
+                G_neuroarch.add_node(neuron.id, **neuron.params.copy())
                 G_neuroarch.node[neuron.id].update(
                     {'name': name,
                      'elev_3d': float(sphere_pos[0]),
@@ -181,14 +181,14 @@ class RetinaArray(object):
                      'acceptance_angle': self.get_angle()})
                 G_neuroarch.add_node(
                     neuron.id+'_port',
-                    {'class': 'Port', 'name': name,
+                    **{'class': 'Port', 'name': name,
                      'port_type': 'gpot', 'port_io': 'out',
                      'circuit': circuit_name,
                      'selector': '/ret/{}/{}'.format(i, name)})
                 G_neuroarch.add_edge(neuron.id, neuron.id+'_port')
                 G_neuroarch.add_node(
                     neuron.id+'_aggregator_port',
-                    {'class': 'Port', 'name': name,
+                    **{'class': 'Port', 'name': name,
                      'port_type': 'gpot', 'port_io': 'in',
                      'circuit': circuit_name,
                      'selector': '/ret/{}/{}_agg'.format(i,name)})
@@ -213,22 +213,22 @@ class RetinaArray(object):
         for i, omm in enumerate(self._ommatidia):
             for name, neuron in omm.neurons.items():
                 neuron.id = 'neuron_{}_{}'.format(name, i)
-                G_workers_nomaster.add_node(neuron.id, neuron.params.copy())
+                G_workers_nomaster.add_node(neuron.id, **neuron.params.copy())
                 G_workers_nomaster.add_node(
                     neuron.id+'_port',
-                    {'class': 'Port', 'name': name,
+                    **{'class': 'Port', 'name': name,
                      'port_type': 'gpot', 'port_io': 'out',
                     'selector': '/ret/{}/{}'.format(i, name)})
                 G_workers_nomaster.add_node(
                         neuron.id+'_photon',
-                        {'class': 'BufferPhoton',
+                        **{'class': 'BufferPhoton',
                         'name': '{}_buf'.format(name)
                     })
                 G_workers_nomaster.add_edge(neuron.id, neuron.id+'_port')
                 G_workers_nomaster.add_edge(neuron.id+'_photon', neuron.id)
                 G_workers_nomaster.add_node(
                     neuron.id+'_aggregator_port',
-                    {'class': 'Port',
+                    **{'class': 'Port',
                      'name': name,
                      'port_type': 'gpot',
                      'port_io': 'in',
@@ -239,17 +239,17 @@ class RetinaArray(object):
 
                 if OpticAxisRule.is_photor(name):
                     ind = OpticAxisRule.name_to_ind(name)
-                    G_workers.add_node(neuron.id, neuron.params.copy())
+                    G_workers.add_node(neuron.id, **neuron.params.copy())
 
                     self.worker_comp_list.append(neuron.id)
-                    G_workers.add_node(neuron.id+'_in', {
+                    G_workers.add_node(neuron.id+'_in', **{
                         'class': 'Port',
                         'name': name,
                         'port_type': 'gpot',
                         'port_io': 'in',
                         'selector': '/retina_worker/{}/in_R{}'.format(i, ind)
                     })
-                    G_workers.add_node(neuron.id+'_out', {
+                    G_workers.add_node(neuron.id+'_out', **{
                         'class': 'Port',
                         'name': name,
                         'port_type': 'gpot',
@@ -260,7 +260,7 @@ class RetinaArray(object):
                                        neuron.id)
                     G_workers.add_edge(neuron.id,
                                        neuron.id+'_out')
-                    G_workers.add_node(neuron.id+'_aggregator_port', {
+                    G_workers.add_node(neuron.id+'_aggregator_port', **{
                         'class': 'Port',
                         'name': name,
                         'port_type': 'gpot',
@@ -272,29 +272,29 @@ class RetinaArray(object):
 
                     num_w2 += 1
 
-                    G_master.add_node(neuron.id+'_photon', {
+                    G_master.add_node(neuron.id+'_photon', **{
                         'class': 'BufferPhoton',
                         'name': 'buf{}'.format(ind)
                     })
-                    G_master.add_node(neuron.id+'_buff_in', {
+                    G_master.add_node(neuron.id+'_buff_in',**{
                         'class': 'Port',
                         'port_type': 'gpot',
                         'port_io': 'in',
                         'name': 'collect_{}'.format(name),
                         'selector': '/retina_master/{}/in_R{}'.format(i, ind)
                     })
-                    G_master.add_node(neuron.id+'_photon_out', {
+                    G_master.add_node(neuron.id+'_photon_out', **{
                         'class': 'Port',
                         'port_type': 'gpot',
                         'port_io': 'out',
                         'name': 'port_buf_{}'.format(name),
                         'selector': '/retina_master/{}/buf_R{}'.format(i, ind)
                     })
-                    G_master.add_node(neuron.id, {
+                    G_master.add_node(neuron.id, **{
                         'class': 'BufferVoltage',
                         'name': 'buf_voltage_{}'.format(name)
                     })
-                    G_master.add_node(neuron.id+'_out', {
+                    G_master.add_node(neuron.id+'_out', **{
                         'class': 'Port',
                         'port_type': 'gpot',
                         'port_io': 'out',
@@ -305,21 +305,21 @@ class RetinaArray(object):
                     G_master.add_edge(neuron.id+'_buff_in', neuron.id)
                     G_master.add_edge(neuron.id, neuron.id+'_out')
 
-                    G_master.add_node(neuron.id+'_aggregator_out', {
+                    G_master.add_node(neuron.id+'_aggregator_out', **{
                         'class': 'Port',
                         'port_type': 'gpot',
                         'port_io': 'out',
                         'name': name,
                         'selector': '/retina_master/{}/agg_R{}'.format(i, ind)
                     })
-                    G_master.add_node(neuron.id+'_aggregator_in', {
+                    G_master.add_node(neuron.id+'_aggregator_in', **{
                         'class': 'Port',
                         'port_type': 'gpot',
                         'port_io': 'in',
                         'name': name,
                         'selector': '/ret/{}/R{}_agg'.format(i, ind)
                     })
-                    G_master.add_node(neuron.id+'_buff_current', {
+                    G_master.add_node(neuron.id+'_buff_current', **{
                         'class': 'BufferCurrent',
                         'name': 'buff_current_'+name,
                     })
@@ -400,7 +400,7 @@ class RetinaArray(object):
         # the global id of
         for i in range(start, end):
             ommatidium = ommatidia[i]
-            for omm_neuron in ommatidium.neurons.itervalues():
+            for omm_neuron in ommatidium.neurons.values():
                 neurons.append((ommatidium.gid,
                                 omm_neuron.name,
                                 ommatidium.sphere_pos))

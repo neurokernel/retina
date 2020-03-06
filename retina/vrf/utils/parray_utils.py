@@ -27,8 +27,8 @@ def get_fill_function(dtype, pitch = True):
                     "name": name,
                     "type_dst": type_dst
             }, options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare(
-            [np.int32, np.int32, np.intp, np.int32, _get_type(dtype)])
+        func.prepare('iiPi'+np.dtype(dtype).char)
+        #    [np.int32, np.int32, np.intp, np.int32, _get_type(dtype)])
     else:
         func = SourceModule(
                 fill_nonpitch_template % {
@@ -36,7 +36,7 @@ def get_fill_function(dtype, pitch = True):
                     "type_dst": type_dst
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.int32, np.intp, _get_type(dtype)])
+        func.prepare('iP'+np.dtype(dtype).char)#[np.int32, np.intp, _get_type(dtype)])
     return func
 
 
@@ -56,8 +56,8 @@ def get_astype_function(dtype_dest, dtype_src, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare(
-                [np.int32, np.int32, np.intp, np.int32, np.intp, np.int32])
+        func.prepare('iiPiPi')
+        #        [np.int32, np.int32, np.intp, np.int32, np.intp, np.int32])
     else:
         func = SourceModule(
                 non_pitch_template % {
@@ -67,7 +67,7 @@ def get_astype_function(dtype_dest, dtype_src, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, np.int32])
+        func.prepare('PPi')#[np.intp, np.intp, np.int32])
     return func
 
 
@@ -104,8 +104,8 @@ def get_realimag_function(dtype, real = True, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare(
-                [np.int32, np.int32, np.intp, np.int32, np.intp, np.int32])
+        func.prepare('iiPiPi')
+        #        [np.int32, np.int32, np.intp, np.int32, np.intp, np.int32])
     else:
         func = SourceModule(
                 non_pitch_template % {
@@ -115,7 +115,7 @@ def get_realimag_function(dtype, real = True, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, np.int32])
+        func.prepare('PPi')#[np.intp, np.intp, np.int32])
     return func
 
 
@@ -148,8 +148,8 @@ def get_abs_function(dtype, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare(
-                [np.int32, np.int32, np.intp, np.int32, np.intp, np.int32])
+        func.prepare('iiPiPi')
+        #        [np.int32, np.int32, np.intp, np.int32, np.intp, np.int32])
     else:
         func = SourceModule(
                 non_pitch_template % {
@@ -159,7 +159,7 @@ def get_abs_function(dtype, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, np.int32])
+        func.prepare('PPi')#[np.intp, np.intp, np.int32])
     return func
 
 
@@ -182,8 +182,8 @@ def get_angle_function(dtypein, dtypeout, pitch = True):
                     "fletter": fletter,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare(
-                [np.int32, np.int32, np.intp, np.int32, np.intp, np.int32])
+        func.prepare('iiPiPi')
+        #        [np.int32, np.int32, np.intp, np.int32, np.intp, np.int32])
     else:
         func = SourceModule(
                 non_pitch_angle_template % {
@@ -193,7 +193,7 @@ def get_angle_function(dtypein, dtypeout, pitch = True):
                     "fletter": fletter,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, np.int32])
+        func.prepare('PPi')#[np.intp, np.intp, np.int32])
     return func
 
 
@@ -218,8 +218,8 @@ def get_conj_function(dtype, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare(
-                [np.int32, np.int32, np.intp, np.int32, np.intp, np.int32])
+        func.prepare('iiPiPi')
+        #        [np.int32, np.int32, np.intp, np.int32, np.intp, np.int32])
     else:
         func = SourceModule(
                 non_pitch_template % {
@@ -229,7 +229,7 @@ def get_conj_function(dtype, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, np.int32])
+        func.prepare('PPi')#[np.intp, np.intp, np.int32])
     return func
 
 
@@ -245,8 +245,8 @@ def get_resize_function(dtype):
                 "operation": "",
             },
             options=["--ptxas-options=-v"]).get_function(name)
-    func.prepare([np.int32, np.int32, np.int32, np.int32,
-                  np.intp, np.int32, np.intp, np.int32])
+    func.prepare('iiiiPiPi')#[np.int32, np.int32, np.int32, np.int32,
+    #              np.intp, np.int32, np.intp, np.int32])
     return func
 
 
@@ -269,8 +269,8 @@ def get_transpose_function(dtype, conj = False):
                 "operation": operation
             },
             options=["--ptxas-options=-v"]).get_function(name)
-    func.prepare([np.int32, np.int32, np.intp,
-                  np.int32, np.intp, np.int32])
+    func.prepare('iiPiPi')#[np.int32, np.int32, np.intp,
+    #              np.int32, np.intp, np.int32])
     return func
 
 
@@ -294,8 +294,8 @@ def get_addarray_function(left_dtype, right_dtype,
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.int32, np.int32, np.intp, np.int32,
-                      np.intp, np.int32, np.intp, np.int32])
+        func.prepare('iiPiPiPi')#[np.int32, np.int32, np.intp, np.int32,
+        #              np.intp, np.int32, np.intp, np.int32])
     else:
         func = SourceModule(
                 non_pitch_array_op_template % {
@@ -306,7 +306,7 @@ def get_addarray_function(left_dtype, right_dtype,
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, np.intp, np.int32])
+        func.prepare('PPPi')#[np.intp, np.intp, np.intp, np.int32])
     return func
 
 
@@ -326,8 +326,8 @@ def get_addscalar_function(src_type, dest_type, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.int32, np.int32, np.intp, np.int32,
-                      np.intp, np.int32, _get_type(dest_type)])
+        func.prepare('iiPiPi'+np.dtype(dest_type).char)#[np.int32, np.int32, np.intp, np.int32,
+        #              np.intp, np.int32, _get_type(dest_type)])
     else:
         func = SourceModule(
                 non_pitch_left_scalar_op_template % {
@@ -337,7 +337,77 @@ def get_addscalar_function(src_type, dest_type, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, _get_type(dest_type), np.int32])
+        func.prepare('PP'+np.dtype(dest_type).char+'i')#[np.intp, np.intp, _get_type(dest_type), np.int32])
+    return func
+
+@context_dependent_memoize
+def get_powarray_function(left_dtype, right_dtype,
+                          rslt_dtype, pitch = True):
+    type_left = dtype_to_ctype(left_dtype)
+    type_right = dtype_to_ctype(right_dtype)
+    type_rslt = dtype_to_ctype(rslt_dtype)
+
+    name = "powarray"
+    operation = "pow"
+    
+    if pitch:
+        func = SourceModule(
+                pitch_array_func_template % {
+                    "name": name,
+                    "dest_type": type_rslt,
+                    "left_type": type_left,
+                    "right_type": type_right,
+                    "operation": operation,
+                    "fletter": 'f' if left_dtype == np.float32 else '',
+                },
+                options=["--ptxas-options=-v"]).get_function(name)
+        func.prepare('iiPiPiPi')#[np.int32, np.int32, np.intp, np.int32,
+        #              np.intp, np.int32, np.intp, np.int32])
+    else:
+        func = SourceModule(
+                non_pitch_array_func_template % {
+                    "name": name,
+                    "dest_type": type_rslt,
+                    "left_type": type_left,
+                    "right_type": type_right,
+                    "operation": operation,
+                    "fletter": 'f' if left_dtype == np.float32 else ''
+                },
+                options=["--ptxas-options=-v"]).get_function(name)
+        func.prepare('PPPi')#[np.intp, np.intp, np.intp, np.int32])
+    return func
+
+
+@context_dependent_memoize
+def get_powscalar_function(src_type, dest_type, pitch = True):
+    type_src = dtype_to_ctype(src_type)
+    type_dest = dtype_to_ctype(dest_type)
+    name = "powscalar"
+    operation = "pow"
+    
+    if pitch:
+        func = SourceModule(
+                pitch_left_scalar_func_template % {
+                    "name": name,
+                    "src_type": type_src,
+                    "dest_type": type_dest,
+                    "operation": operation,
+                    "fletter": 'f' if src_type == np.float32 else '',
+                },
+                options=["--ptxas-options=-v"]).get_function(name)
+        func.prepare('iiPiPi'+np.dtype(dest_type).char)#[np.int32, np.int32, np.intp, np.int32,
+        #              np.intp, np.int32, _get_type(dest_type)])
+    else:
+        func = SourceModule(
+                non_pitch_left_scalar_func_template % {
+                    "name": name,
+                    "src_type": type_src,
+                    "dest_type": type_dest,
+                    "operation": operation,
+                    "fletter": 'f' if src_type == np.float32 else '',
+                },
+                options=["--ptxas-options=-v"]).get_function(name)
+        func.prepare('PP'+np.dtype(dest_type).char+'i')#[np.intp, np.intp, _get_type(dest_type), np.int32])
     return func
 
 
@@ -359,8 +429,8 @@ def get_subarray_function(left_dtype, right_dtype, rslt_dtype, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.int32, np.int32, np.intp, np.int32,
-                      np.intp, np.int32, np.intp, np.int32])
+        func.prepare('iiPiPiPi')#[np.int32, np.int32, np.intp, np.int32,
+        #              np.intp, np.int32, np.intp, np.int32])
     else:
         func = SourceModule(
                 non_pitch_array_op_template % {
@@ -371,7 +441,7 @@ def get_subarray_function(left_dtype, right_dtype, rslt_dtype, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, np.intp, np.int32])
+        func.prepare('PPPi')#[np.intp, np.intp, np.intp, np.int32])
     return func
 
 
@@ -392,8 +462,8 @@ def get_subscalar_function(src_type, dest_type, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.int32, np.int32, np.intp, np.int32,
-                      np.intp, np.int32, _get_type(dest_type)])
+        func.prepare('iiPiPi'+np.dtype(dest_type).char)#[np.int32, np.int32, np.intp, np.int32,
+        #              np.intp, np.int32, _get_type(dest_type)])
     else:
         func = SourceModule(
                 non_pitch_left_scalar_op_template % {
@@ -403,7 +473,7 @@ def get_subscalar_function(src_type, dest_type, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, _get_type(dest_type), np.int32])
+        func.prepare('PP'+np.dtype(dest_type).char+'i')#[np.intp, np.intp, _get_type(dest_type), np.int32])
     return func
 
 
@@ -424,8 +494,8 @@ def get_scalarsub_function(src_type, dest_type, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.int32, np.int32, np.intp, np.int32,
-                      np.intp, np.int32, _get_type(dest_type)])
+        func.prepare('iiPiPi'+np.dtype(dest_type).char)#[np.int32, np.int32, np.intp, np.int32,
+        #              np.intp, np.int32, _get_type(dest_type)])
     else:
         func = SourceModule(
                 non_pitch_right_scalar_op_template % {
@@ -435,7 +505,7 @@ def get_scalarsub_function(src_type, dest_type, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, _get_type(dest_type), np.int32])
+        func.prepare('PP'+np.dtype(dest_type).char+'i')#[np.intp, np.intp, _get_type(dest_type), np.int32])
     return func
 
 
@@ -458,8 +528,8 @@ def get_mularray_function(left_dtype, right_dtype, rslt_dtype, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.int32, np.int32, np.intp, np.int32,
-                      np.intp, np.int32, np.intp, np.int32])
+        func.prepare('iiPiPiPi')#[np.int32, np.int32, np.intp, np.int32,
+        #              np.intp, np.int32, np.intp, np.int32])
     else:
         func = SourceModule(
                 non_pitch_array_op_template % {
@@ -470,7 +540,7 @@ def get_mularray_function(left_dtype, right_dtype, rslt_dtype, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, np.intp, np.int32])
+        func.prepare('PPPi')#[np.intp, np.intp, np.intp, np.int32])
     return func
 
 
@@ -491,8 +561,8 @@ def get_mulscalar_function(src_type, dest_type, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.int32, np.int32, np.intp, np.int32,
-                      np.intp, np.int32, _get_type(dest_type)])
+        func.prepare('iiPiPi'+np.dtype(dest_type).char)#[np.int32, np.int32, np.intp, np.int32,
+        #              np.intp, np.int32, _get_type(dest_type)])
     else:
         func = SourceModule(
                 non_pitch_left_scalar_op_template % {
@@ -502,7 +572,7 @@ def get_mulscalar_function(src_type, dest_type, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, _get_type(dest_type), np.int32])
+        func.prepare('PP'+np.dtype(dest_type).char+'i')#[np.intp, np.intp, _get_type(dest_type), np.int32])
     return func
 
 
@@ -525,8 +595,8 @@ def get_divarray_function(left_dtype, right_dtype, rslt_dtype, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.int32, np.int32, np.intp, np.int32,
-                      np.intp, np.int32, np.intp, np.int32])
+        func.prepare('iiPiPiPi')#[np.int32, np.int32, np.intp, np.int32,
+        #             np.intp, np.int32, np.intp, np.int32])
     else:
         func = SourceModule(
                 non_pitch_array_op_template % {
@@ -537,7 +607,7 @@ def get_divarray_function(left_dtype, right_dtype, rslt_dtype, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, np.intp, np.int32])
+        func.prepare('PPPi')#[np.intp, np.intp, np.intp, np.int32])
     return func
 
 
@@ -558,8 +628,8 @@ def get_divscalar_function(src_type, dest_type, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.int32, np.int32, np.intp, np.int32,
-                      np.intp, np.int32, _get_type(dest_type)])
+        func.prepare('iiPiPi'+np.dtype(dest_type).char)#[np.int32, np.int32, np.intp, np.int32,
+        #              np.intp, np.int32, _get_type(dest_type)])
     else:
         func = SourceModule(
                 non_pitch_left_scalar_op_template % {
@@ -569,7 +639,7 @@ def get_divscalar_function(src_type, dest_type, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, _get_type(dest_type), np.int32])
+        func.prepare('PP'+np.dtype(dest_type).char+'i')#[np.intp, np.intp, _get_type(dest_type), np.int32])
     return func
 
 
@@ -590,8 +660,8 @@ def get_scalardiv_function(src_type, dest_type, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.int32, np.int32, np.intp, np.int32,
-                      np.intp, np.int32, _get_type(dest_type)])
+        func.prepare('iiPiPi'+np.dtype(dest_type).char)#[np.int32, np.int32, np.intp, np.int32,
+        #              np.intp, np.int32, _get_type(dest_type)])
     else:
         func = SourceModule(
                 non_pitch_right_scalar_op_template % {
@@ -601,7 +671,7 @@ def get_scalardiv_function(src_type, dest_type, pitch = True):
                     "operation": operation,
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, _get_type(dest_type), np.int32])
+        func.prepare('PP'+np.dtype(dest_type).char+'i')#[np.intp, np.intp, _get_type(dest_type), np.int32])
     return func
 
 
@@ -622,8 +692,8 @@ def get_complex_function(real_type, imag_type, result_type, pitch = True):
                     "result_type": type_result
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.int32, np.int32, np.intp, np.int32,
-                      np.intp, np.intp, np.int32])
+        func.prepare('iiPiPPi')#[np.int32, np.int32, np.intp, np.int32,
+        #              np.intp, np.intp, np.int32])
     else:
         func = SourceModule(
                 non_pitch_complex_template % {
@@ -633,7 +703,37 @@ def get_complex_function(real_type, imag_type, result_type, pitch = True):
                     "result_type": type_result
                 },
                 options=["--ptxas-options=-v"]).get_function(name)
-        func.prepare([np.intp, np.intp, np.intp, np.int32])
+        func.prepare('PPPi')#[np.intp, np.intp, np.intp, np.int32])
+    return func
+
+@context_dependent_memoize
+def get_complex_from_amp_function(in_type, result_type, pitch = True):
+    type_in = dtype_to_ctype(in_type)
+    type_result = dtype_to_ctype(result_type)
+    
+    name = "makecomplex_amp_phase"
+    
+    if pitch:
+        func = SourceModule(
+                pitch_complex_amp_template % {
+                    "name": name,
+                    "in_type": type_in,
+                    "result_type": type_result,
+                    "fletter": 'f' if in_type == np.float32 else ''
+                },
+                options=["--ptxas-options=-v"]).get_function(name)
+        func.prepare('iiPiPPi')#[np.int32, np.int32, np.intp, np.int32,
+        #              np.intp, np.intp, np.int32])
+    else:
+        func = SourceModule(
+                non_pitch_complex_amp_template % {
+                    "name": name,
+                    "in_type": type_in,
+                    "result_type": type_result,
+                    "fletter": 'f' if in_type == np.float32 else ''
+                },
+                options=["--ptxas-options=-v"]).get_function(name)
+        func.prepare('PPPi')#[np.intp, np.intp, np.intp, np.int32])
     return func
 
 
@@ -772,6 +872,67 @@ __global__ void
     for (int i = tid; i < N; i += totalthreads)
     {
         tmp = %(result_type)s(real[i], imag[i]);
+        odata[i] = (tmp);
+    }
+}
+
+"""
+
+pitch_complex_amp_template = """
+#include <pycuda-complex.hpp>
+
+__global__ void
+%(name)s(const int M, const int N, %(result_type)s *odata,
+         const int ldo, const %(in_type)s *amp,
+         const %(in_type)s *phase, const int ldi)
+{
+    //M is the number of rows, N is the number of columns
+    const int tid = threadIdx.x;
+    const int sid = threadIdx.y + blockDim.y * blockIdx.x;
+    const int total = gridDim.x * blockDim.y;
+
+    int m, n, idx;
+    %(result_type)s tmp;
+    int segment_per_row = ((N - 1) >> 5) + 1;
+    int total_segments = M * segment_per_row;
+    %(in_type)s c,s, a;
+    
+    for(int i = sid; i < total_segments; i+=total)
+    {
+        m = i / segment_per_row;
+        n = i %% segment_per_row;
+        idx = (n<<5) + tid;
+        if(idx < N)
+        {
+            sincos%(fletter)s(phase[m*ldi+idx], &s, &c);
+            a = amp[m*ldi+idx];
+            tmp = %(result_type)s(a*c, a*s);
+            odata[m * ldo + idx] = (tmp);
+        }
+    }
+}
+
+"""
+
+
+non_pitch_complex_amp_template = """
+#include <pycuda-complex.hpp>
+
+__global__ void
+%(name)s(%(result_type)s *odata, const %(in_type)s *amp,
+         const %(in_type)s *phase, const int N)
+{
+    const int totalthreads = blockDim.x * gridDim.x;
+    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    %(result_type)s tmp;
+    %(in_type)s c,s, a;
+
+    for (int i = tid; i < N; i += totalthreads)
+    {
+        sincos%(fletter)s(phase[i], &s, &c);
+        a = amp[i];
+        tmp = %(result_type)s(a*c, a*s);
         odata[i] = (tmp);
     }
 }
@@ -1199,3 +1360,156 @@ __global__ void
 
 """
 
+
+pitch_array_func_template = pycuda_complex_header + """
+__global__ void
+%(name)s(const int M, const int N, %(dest_type)s *dest,
+         const int ld_dest, const %(left_type)s *left,
+         const int ld_left, const %(right_type)s *right,
+         const int ld_right)
+{
+    //M is the number of rows, N is the number of columns
+    const int tid = threadIdx.x;
+    const int sid = threadIdx.y + blockDim.y * blockIdx.x;
+    const int total = gridDim.x * blockDim.y;
+
+    int m, n, idx;
+    %(left_type)s tmp_left;
+    %(right_type)s tmp_right;
+    int segment_per_row = ((N - 1) >> 5) + 1;
+    int total_segments = M * segment_per_row;
+        
+    for(int i = sid; i < total_segments; i+=total)
+    {
+        m = i / segment_per_row;
+        n = i %% segment_per_row;
+        idx = (n<<5) + tid;
+        if(idx < N)
+        {
+            tmp_left = left[m * ld_left + idx];
+            tmp_right = right[m * ld_right + idx];
+            dest[m * ld_dest + idx] = %(operation)s%(fletter)s((tmp_left) , (tmp_right));
+        }
+    }
+}
+
+"""
+
+non_pitch_array_func_template = pycuda_complex_header + """
+__global__ void
+%(name)s(%(dest_type)s *dest, const %(left_type)s *left,
+         const %(right_type)s *right, const int N)
+{
+    const int totalthreads = blockDim.x * gridDim.x;
+    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    %(left_type)s tmp_left;
+    %(right_type)s tmp_right;
+
+    for (int i = tid; i < N; i += totalthreads)
+    {
+        tmp_left = left[i];
+        tmp_right = right[i];
+        dest[i] = %(operation)s%(fletter)s((tmp_left) , (tmp_right));
+    }
+}
+
+"""
+
+
+pitch_left_scalar_func_template = pycuda_complex_header + """
+__global__ void
+%(name)s(const int M, const int N, %(dest_type)s *dest,
+         const int ld_dest, const %(src_type)s *left,
+         const int ld_left, const %(dest_type)s right)
+{
+    //M is the number of rows, N is the number of columns
+    const int tid = threadIdx.x;
+    const int sid = threadIdx.y + blockDim.y * blockIdx.x;
+    const int total = gridDim.x * blockDim.y;
+    int m, n, idx;
+    %(src_type)s tmp_left;
+    int segment_per_row = ((N - 1) >> 5) + 1;
+    int total_segments = M * segment_per_row;
+    
+    for(int i = sid; i < total_segments; i+=total)
+    {
+        m = i / segment_per_row;
+        n = i %% segment_per_row;
+        idx = (n<<5) + tid;
+        if(idx < N)
+        {
+            tmp_left = left[m * ld_left + idx];
+            dest[m * ld_dest + idx] = %(operation)s%(fletter)s((tmp_left) , (right));
+        }
+    }
+}
+
+"""
+
+non_pitch_left_scalar_func_template = pycuda_complex_header + """
+__global__ void
+%(name)s(%(dest_type)s *dest, const %(src_type)s *left,
+         const %(dest_type)s right, const int N)
+{
+    const int totalthreads = blockDim.x * gridDim.x;
+    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    %(src_type)s tmp_left;
+    for (int i = tid; i < N; i += totalthreads)
+    {
+        tmp_left = left[i];
+        dest[i] = %(operation)s%(fletter)s((tmp_left) , (right));
+    }
+}
+
+"""
+
+pitch_right_scalar_func_template = pycuda_complex_header + """
+__global__ void
+%(name)s(const int M, const int N, %(dest_type)s *dest,
+         const int ld_dest, const %(src_type)s *left,
+         const int ld_left, const %(dest_type)s right)
+{
+    //M is the number of rows, N is the number of columns
+    const int tid = threadIdx.x;
+    const int sid = threadIdx.y + blockDim.y * blockIdx.x;
+    const int total = gridDim.x * blockDim.y;
+
+    int m, n, idx;
+    %(src_type)s tmp_left;
+    int segment_per_row = ((N - 1) >> 5) + 1;
+    int total_segments = M * segment_per_row;
+    
+    for(int i = sid; i < total_segments; i+=total)
+    {
+        m = i / segment_per_row;
+        n = i %% segment_per_row;
+        idx = (n<<5) + tid;
+        if(idx < N)
+        {
+            tmp_left = left[m * ld_left + idx];
+            dest[m * ld_dest + idx] = %(operation)s%(fletter)s((right) , (tmp_left));
+        }
+    }
+}
+
+"""
+
+non_pitch_right_scalar_func_template = pycuda_complex_header + """
+__global__ void
+%(name)s(%(dest_type)s *dest, const %(dest_type)s *left,
+         const %(src_type)s right, const int N)
+{
+    const int totalthreads = blockDim.x * gridDim.x;
+    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    %(src_type)s tmp_left;
+    for (int i = tid; i < N; i += totalthreads)
+    {
+        tmp_left = left[i];
+        dest[i] = %(operation)s%(fletter)s((right) , (tmp_left));
+    }
+}
+
+"""

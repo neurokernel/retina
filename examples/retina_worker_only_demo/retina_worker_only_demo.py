@@ -63,11 +63,11 @@ def add_retina_LPU(config, i, retina, manager):
 
     inputmethod = config['Retina']['inputmethod']
     if inputmethod == 'read':
-        print 'Reading from previously generated input'
-        print 'The configuration must stay the same.'
+        print('Reading from previously generated input')
+        print('The configuration must stay the same.')
         input_processor = FileInputProcessor('{}.h5'.format(config['Retina']['input_file']))
     else:
-        print 'Using input generating function'
+        print('Using input generating function')
         input_processor = RetinaInputProcessor(config, retina)
 
     output_processor = FileOutputProcessor([('V',None)], output_file, sample_interval=1)
@@ -160,14 +160,14 @@ def main():
     eulerangles = config['Retina']['eulerangles']
 
     manager = core.Manager()
-    
+
     with Timer('instantiation of retina'):
         transform = AlbersProjectionMap(radius, eulerangles).invmap
         hexagon = hx.HexagonArray(num_rings=num_rings, radius=radius,
                                   transform=transform)
 
         retina = ret.RetinaArray(hexagon, config)
-        
+
         # sets retina attribute which is required for the generation of
         # receptive fields
         #if generator is not None:

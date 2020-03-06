@@ -18,11 +18,11 @@ class RetinaInputProcessor(BaseInputProcessor):
         screen_cls = cls_map.get_screen_cls(self.screen_type)
         self.screen = screen_cls(config)
         self.retina = retina
-        
+
         uids = ['neuron_{}_{}_photon'.format(name, i) for i in range(retina.num_elements)
                 for name in ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']]
 
-        
+
         super(RetinaInputProcessor, self).__init__([('photon',uids)], mode=0)
 
     def pre_run(self):
@@ -41,14 +41,14 @@ class RetinaInputProcessor(BaseInputProcessor):
                 maxshape=(None, self.retina.num_photoreceptors))
         self.input_file_handle.create_dataset(
                 'photon/uids',
-                data=np.array(self.variables['photon']['uids']))
-    
+                data=np.array(self.variables['photon']['uids'], dtype = 'S'))
+
     def generate_datafiles(self):
         screen = self.screen
         retina = self.retina
         config = self.config
         rfs = self.rfs
-        
+
         screen.setup_file('intensities.h5')
 
         retina_elev_file = 'retina_elev.h5'
@@ -59,7 +59,7 @@ class RetinaInputProcessor(BaseInputProcessor):
 
         retina_dima_file = 'retina_dima.h5'
         retina_dimb_file = 'retina_dimb.h5'
-        
+
         self.input_file = '{}.h5'.format(config['Retina']['input_file'])
 
         elev_v, azim_v = retina.get_ommatidia_pos()
@@ -71,7 +71,7 @@ class RetinaInputProcessor(BaseInputProcessor):
                                (rfs.refa, retina_dima_file),
                                (rfs.refb, retina_dimb_file)]:
             write_array(data, filename)
-    
+
         self.file_open = False
 
     def generate_receptive_fields(self):
@@ -100,7 +100,7 @@ class RetinaInputProcessor(BaseInputProcessor):
 
         rfs.generate_filters()
         self.rfs = rfs
-    
+
     def update_input(self):
         im = self.screen.get_screen_intensity_steps(1)
         # reshape neede for inputs in order to write file to an array
@@ -110,11 +110,11 @@ class RetinaInputProcessor(BaseInputProcessor):
              len(self.variables['photon']['uids'])))
         self.input_file_handle['photon/data'][-1,:] = inputs
         self.variables['photon']['input'][:] = inputs
-                         
-    
+
+
     def is_input_available(self):
         return True
-    
+
     def post_run(self):
         self.input_file_handle.close()
 
@@ -124,4 +124,3 @@ class RetinaInputProcessor(BaseInputProcessor):
             self.input_file_handle.close()
         except:
             pass
-    

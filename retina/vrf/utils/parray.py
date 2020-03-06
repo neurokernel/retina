@@ -11,6 +11,7 @@ import pycuda.driver as cuda
 from pytools import memoize
 
 from . import parray_utils as pu
+from past.builtins import long
 
 """ utilities"""
 @memoize
@@ -125,8 +126,7 @@ def _assignshape(shape, axis, value):
     return tuple(a)
 
 
-def PitchTrans(shape, dst, dst_ld, src, src_ld, dtype, aligned=False,
-               async = False, stream = None):
+def PitchTrans(shape, dst, dst_ld, src, src_ld, dtype, aligned=False, _async = False, stream = None):
     """
     Wrapper around cuda.Memcpy2D
     Enable pitched memory transfer.
@@ -135,11 +135,11 @@ def PitchTrans(shape, dst, dst_ld, src, src_ld, dtype, aligned=False,
     ----------
     shape : tuple of ints
         shape of the 2D array to be transferred.
-    dst : { cuda.DeviceAllocation, int}
+    dst : { cuda.DeviceAllocation, int, long }
         pointer to the device memory to be transferred to.
     dst_ld: int
         leading dimension (pitch) of destination.
-    src : { pycuda.driver.DeviceAllocation, int}
+    src : { pycuda.driver.DeviceAllocation, int, long }
         pointer to the device memory to be transferred from.
     src_ld : int
         leading dimension (pitch) of source.
@@ -160,13 +160,13 @@ def PitchTrans(shape, dst, dst_ld, src, src_ld, dtype, aligned=False,
 
     trans = cuda.Memcpy2D()
     trans.src_pitch = src_ld * size
-    if isinstance(src, (cuda.DeviceAllocation, int)):
+    if isinstance(src, (cuda.DeviceAllocation, int, long)):
         trans.set_src_device(src)
     else:
         trans.set_src_host(src)
 
     trans.dst_pitch = dst_ld * size
-    if isinstance(dst, (cuda.DeviceAllocation, int)):
+    if isinstance(dst, (cuda.DeviceAllocation, int, long)):
         trans.set_dst_device(dst)
     else:
         trans.set_dst_host(dst)
@@ -174,13 +174,12 @@ def PitchTrans(shape, dst, dst_ld, src, src_ld, dtype, aligned=False,
     trans.width_in_bytes = _pd(shape) * size
     trans.height = int(shape[0])
 
-    if async:
+    if _async:
         trans(stream)
     else:
         trans(aligned = aligned)
 
 """end of utilities"""
-
 
 class PitchArray(object):
     def __init__(self, shape, dtype, gpudata=None, pitch = None, base = None):
@@ -372,7 +371,7 @@ class PitchArray(object):
                 cuda.memcpy_htod_async(int(self.gpudata), ary, stream)
             else:
                 PitchTrans(self.shape, int(self.gpudata), self.ld, ary,
-                           _pd(self.shape), self.dtype, async = True,
+                           _pd(self.shape), self.dtype, _async = True,
                            stream = stream)
 
     def get(self, ary = None, pagelocked = False):
@@ -441,7 +440,7 @@ class PitchArray(object):
             else:
                 PitchTrans(self.shape, ary, _pd(self.shape),
                            int(self.gpudata), self.ld, self.dtype,
-                           async = True, stream = stream)
+                           _async = True, stream = stream)
 
         return ary
 
@@ -873,7 +872,7 @@ class PitchArray(object):
                                       np.floating, np.complexfloating)):
             dtype = _get_common_dtype_with_scalar(other, self)
             if other == 0:
-                return self.astype(dtype)
+                return self
             else:
                 if self.dtype != dtype:
                     result = self._new_like_me(dtype)
@@ -938,7 +937,7 @@ class PitchArray(object):
                                       np.floating, np.complexfloating)):
             dtype = _get_common_dtype_with_scalar(other, self)
             if other == 0:
-                return self.astype(dtype)
+                return self
             else:
                 if self.dtype != dtype:
                     result = self._new_like_me(dtype)
@@ -1004,7 +1003,7 @@ class PitchArray(object):
                                       np.floating, np.complexfloating)):
             dtype = _get_common_dtype_with_scalar(other, self)
             if other == 1.0:
-                return self.astype(dtype)
+                return self
             else:
                 if self.dtype != dtype:
                     result = self._new_like_me(dtype)
@@ -1070,7 +1069,7 @@ class PitchArray(object):
                                       np.floating, np.complexfloating)):
             dtype = _get_common_dtype_with_scalar(other, self)
             if other == 1.0:
-                return self.astype(dtype)
+                return self
             else:
                 if self.dtype != dtype:
                     result = self._new_like_me(dtype)
@@ -1094,6 +1093,120 @@ class PitchArray(object):
         else:
             raise TypeError("type of object to be divided"
                             "is not supported")
+
+    def __pow__(self, other):
+        if isinstance(other, PitchArray):
+            if self.shape != other.shape:
+                raise ValueError("array dimension misaligned")
+            result = self._new_like_me(_get_common_dtype(self, other))
+            if self.size:
+                if self.M == 1:
+                    func = pu.get_powarray_function(
+                        self.dtype, other.dtype, result.dtype, pitch = False)
+                    func.prepared_call(
+                        self._grid, self._block, result.gpudata,
+                        self.gpudata, other.gpudata, self.size)
+                else:
+                    func = pu.get_powarray_function(
+                        self.dtype, other.dtype, result.dtype, pitch = True)
+                    func.prepared_call(
+                        self._grid, self._block, self.M, self.N,
+                        result.gpudata, result.ld, self.gpudata,
+                        self.ld, other.gpudata, other.ld)
+            return result
+        elif issubclass(type(other), (float, int, complex, np.integer,
+                                      np.floating, np.complexfloating)):
+            dtype = _get_common_dtype_with_scalar(other, self)
+            if other == 0:
+                return self.astype(dtype)
+            else:
+                result = self._new_like_me(dtype)
+                if self.size:
+                    if self.M == 1:
+                        func = pu.get_powscalar_function(
+                            self.dtype, dtype, pitch = False)
+                        func.prepared_call(
+                            self._grid, self._block, result.gpudata,
+                            self.gpudata, other, self.size)
+                    else:
+                        func = pu.get_powscalar_function(
+                            self.dtype, dtype, pitch = True)
+                        func.prepared_call(
+                            self._grid, self._block, self.M, self.N,
+                            result.gpudata, result.ld, self.gpudata,
+                            self.ld, other)
+                return result
+        else:
+            raise TypeError("type of object to be powered is not supported")
+
+    def __ipow__(self, other):
+        """
+        add to self inplace
+
+        Parameters
+        ----------
+        other: scalar or Pitcharray
+
+        Returns
+        -------
+        out : PitchArray (self)
+
+        Note
+        ----
+        If other is complex, self is required to be a complex
+        """
+        if isinstance(other, PitchArray):
+            if self.shape != other.shape:
+                raise ValueError("array dimension misaligned")
+            dtype = _get_common_dtype(self, other)
+            if self.dtype == dtype:
+                result = self
+            else:
+                result = self._new_like_me(dtype = dtype)
+
+            if self.size:
+                if self.M == 1:
+                    func = pu.get_powarray_function(
+                        self.dtype, other.dtype, result.dtype, pitch = False)
+                    func.prepared_call(
+                        self._grid, self._block, result.gpudata,
+                        self.gpudata, other.gpudata, self.size)
+                else:
+                    func = pu.get_powarray_function(
+                        self.dtype, other.dtype, result.dtype, pitch = True)
+                    func.prepared_call(self._grid, self._block,
+                        self.M, self.N, result.gpudata, result.ld,
+                        self.gpudata, self.ld, other.gpudata, other.ld)
+            return result
+        elif issubclass(type(other), (float, int, complex, np.integer,
+                                      np.floating, np.complexfloating)):
+            dtype = _get_common_dtype_with_scalar(other, self)
+            if other == 0:
+                return self.astype(dtype)
+            else:
+                if self.dtype != dtype:
+                    result = self._new_like_me(dtype)
+                else:
+                    result = self
+                if self.size:
+                    if self.M == 1:
+                        func = pu.get_powscalar_function(
+                            self.dtype, dtype, pitch = False)
+                        func.prepared_call(
+                            self._grid, self._block, result.gpudata,
+                            self.gpudata, other, self.size)
+                    else:
+                        func = pu.get_powscalar_function(
+                            self.dtype, dtype, pitch = True)
+                        func.prepared_call(
+                            self._grid, self._block, self.M, self.N,
+                            result.gpudata, self.ld, self.gpudata,
+                            self.ld, other)
+                return result
+        else:
+            raise TypeError("type of object to be powered"
+                            "is not supported")
+
 
     def add(self, other):
         """
@@ -1416,13 +1529,17 @@ class PitchArray(object):
 
                 func.prepared_call(
                     self._grid, self._block, self.M, self.N,
-                    self.gpudata, self.ld, value)
+                    self.gpudata, self.ld, self.dtype.type(value))
 
-    def copy(self):
+    def copy(self, result=None):
         """
         Returns a duplicated copy of self
         """
-        result = self._new_like_me()
+        if not result:
+            result = self._new_like_me()
+        else:
+            assert(self.dtype == result.dtype)
+            assert(self.mem_size == result.mem_size)
         if self.size:
             cuda.memcpy_dtod(
                 result.gpudata, self.gpudata,
@@ -1575,7 +1692,7 @@ class PitchArray(object):
                 raise ValueError("can only specify one unknown dimension")
             else:
                 if sx % s == 0:
-                    shape = _assignshape(shape, idx, int(sx / s))
+                    shape = _assignshape(shape, idx, int(sx // s))
                 else:
                     raise ValueError("cannot infer the size "
                                      "of the remaining axis")
@@ -2158,3 +2275,22 @@ def angle(array):
                 array._grid, array._block, array.M, array.N,
                 result.gpudata, result.ld, array.gpudata, array.ld)
         return result
+
+
+def complex_from_amp_phase(amp, phase):
+    """ Returns the angle of each element in a complex array """
+    result = empty(amp.shape, dtype = floattocomplex(amp.dtype))
+
+    if amp.M == 1:
+        func = pu.get_complex_from_amp_function(amp.dtype, result.dtype, pitch = False)
+        func.prepared_call(
+            amp._grid, amp._block, result.gpudata,
+            amp.gpudata, phase.gpudata, amp.size)
+    else:
+        func = pu.get_complex_from_amp_function(
+            amp.dtype, result.dtype, pitch = True)
+        func.prepared_call(
+            amp._grid, amp._block, amp.M, amp.N,
+            result.gpudata, result.ld, amp.gpudata,
+            phase.gpudata, amp.ld)
+    return result

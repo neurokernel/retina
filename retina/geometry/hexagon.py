@@ -100,7 +100,7 @@ class HexagonArray(object):
         np.seterr(divide='ignore')
         # section ids, each ring is divided into 6 sections
         # each corresponding to an edge of the ring
-        self._sids = np.divide(self._lids, self._rids)
+        self._sids = self._lids//self._rids
         # section local ids, the number from the first element of the section.
         self._mids = np.mod(self._lids, self._rids)
         np.seterr(divide='warn')
