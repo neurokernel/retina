@@ -40,14 +40,14 @@ def generate_gexf(config, output_file):
     photoreceptors = config['photoreceptors']
 
     for i in range(photoreceptors):
-        G.node[i] = {
+        G.add_node(i, **{
             'class': 'PhotoreceptorModel',
             'name': 'photoreceptor{}'.format(i),
             'selector': '/photor{}'.format(i),
             'num_microvilli': micro,
             'init_V': -81.99, 'init_sa': 0.2184, 'init_si': 0.9653,
             'init_dra': 0.0117, 'init_dri': 0.9998, 'init_nov': 0.0017
-        }
+        })
 
     return G
 
