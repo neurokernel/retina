@@ -19,10 +19,9 @@ class PhotoreceptorModel(BaseMembraneModel):
         self.num_neurons = self.num_microvilli.size
 
         self.dt = dt
-        self.run_dt = 1e-4
 
-        self.multiple = int(self.dt/self.run_dt)
-        assert(self.multiple * self.run_dt == self.dt)
+        # self.multiple = int(self.dt/self.run_dt)
+        # assert(self.multiple * self.run_dt == self.dt)
 
         self.record_neuron = debug
         self.debug = debug
@@ -47,6 +46,26 @@ class PhotoreceptorModel(BaseMembraneModel):
         self.params_dict = params_dict
         self.access_buffers = access_buffers
         self._initialize(params_dict)
+
+    @property
+    def maximum_dt_allowed(self):
+        return 1e-4
+
+    @property
+    def internal_steps(self):
+        if self.dt > self.maximum_dt_allowed:
+            div = self.dt/self.maximum_dt_allowed
+            if np.abs(div - np.round(div)) < 1e-5:
+                return int(np.round(div))
+            else:
+                return int(np.ceil(div))
+            #raise ValueError('Simulation time step dt larger than maximum allowed dt of model {}'.format(type(self)))
+        else:
+            return 1
+
+    @property
+    def internal_dt(self):
+        return self.dt/self.internal_steps
 
     def pre_run(self, update_pointers):
         cuda.memcpy_dtod(int(update_pointers['V']),
@@ -168,7 +187,7 @@ class PhotoreceptorModel(BaseMembraneModel):
                 self.params_dict['cumpre']['photon'].gpudata,
                 self.num_neurons)
 
-        for _ in range(self.multiple):
+        for _ in range(self.internal_steps):
             if self.debug:
                 minimum = min(self.photons.get())
                 if (minimum < 0):
@@ -182,7 +201,7 @@ class PhotoreceptorModel(BaseMembraneModel):
             # X, V, ns, photons -> X
             self.transduction_func.prepared_async_call(
                 self.grid_transduction, self.block_transduction, st,
-                self.randState.gpudata, self.run_dt,
+                self.randState.gpudata, self.internal_dt,
                 update_pointers['V'], self.ns.gpudata,
                 self.photons.gpudata,
                 self.d_num_microvilli.gpudata,
@@ -200,11 +219,11 @@ class PhotoreceptorModel(BaseMembraneModel):
                 self.grid_hh, self.block_hh, st,
                 self.I.gpudata, update_pointers['V'], self.hhx[0].gpudata,
                 self.hhx[1].gpudata, self.hhx[2].gpudata, self.hhx[3].gpudata,
-                self.hhx[4].gpudata, self.num_neurons, self.run_dt/10, 10)
+                self.hhx[4].gpudata, self.num_neurons, self.internal_dt/10, 10)
 
             self.update_ns_func.prepared_async_call(
                 ( (self.num_neurons - 1) // 128 + 1, 1), (128, 1, 1), st,
-                self.ns.gpudata, self.num_neurons, update_pointers['V'], self.run_dt)
+                self.ns.gpudata, self.num_neurons, update_pointers['V'], self.internal_dt)
 
 
 

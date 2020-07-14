@@ -16,7 +16,7 @@ class BufferPhoton(BaseMembraneModel):
             self.compile_options = ['--ptxas-options=-v']
         else:
             self.compile_options = []
-                
+
         self.dt = np.double(dt)
         self.debug = debug
         self.dtype = np.double
@@ -24,13 +24,17 @@ class BufferPhoton(BaseMembraneModel):
         self.LPU_id = LPU_id
 
         self.params_dict = params_dict
-        
+
         self.num_neurons = params_dict['pre']['photon'].size
         self.access_buffers = access_buffers
         self.update = get_re_sort_func(self.dtype, self.compile_options)
-        
+
         self.block_re_sort = (256, 1, 1)
         self.grid_re_sort = (cuda.Context.get_device().MULTIPROCESSOR_COUNT*5, 1)
+
+    @property
+    def maximum_dt_allowed(self):
+        return 1.
 
     def run_step(self, update_pointers, st=None):
         self.update.prepared_async_call(

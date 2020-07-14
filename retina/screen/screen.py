@@ -23,7 +23,7 @@ class Screen(object):
         self._dtype = np.double
 
         # config attributes
-        self._dt = config['General']['dt']
+        # self._dt = config['General']['dt']
         self._input_type = config['Retina']['intype']
         if self._input_type is None:
             raise ValueError('No input type specified')

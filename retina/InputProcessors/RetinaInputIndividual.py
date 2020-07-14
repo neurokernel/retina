@@ -10,10 +10,11 @@ import pycuda.driver as cuda
 from neurokernel.LPU.InputProcessors.BaseInputProcessor import BaseInputProcessor
 
 class RetinaInputIndividual(BaseInputProcessor):
-    def __init__(self, config, photoreceptor_list, user_id = ''):
+    def __init__(self, config, photoreceptor_list, user_id = '',
+                 input_file = None, input_interval = 1):
         """
         config: see retina configuration template
-        
+
         photoreceptor_list: a list of tuple get from
                             networkx.MultiDigraph.nodes(data=True),
                             i.e., the first element of the tuple is the id
@@ -22,41 +23,43 @@ class RetinaInputIndividual(BaseInputProcessor):
         """
         self.config = config
 
-        self.screen_type = config['Retina']['screentype']
-        self.filtermethod = config['Retina']['filtermethod']
+        self.screen_type = config['Retina'].get('screentype', 'sphere')
+        self.filtermethod = config['Retina'].get('filtermethod', 'gpu')
         screen_cls = cls_map.get_screen_cls(self.screen_type)
         self.screen = screen_cls(config)
         #self.retina = retina
         self.pr_list = photoreceptor_list
-        self.retina_radius = config['Retina']['radius']
+        self.retina_radius = config['Retina'].get('radius', 1.0)
         self.num_photoreceptors = len(photoreceptor_list)
         self.user_id = user_id
-        
+
         #uids = ['neuron_{}_{}'.format(name, i) for i in range(retina.num_elements)
         #        for name in ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']]
         uids = [a[0] for a in self.pr_list]
-        
-        super(RetinaInputIndividual, self).__init__([('photon',uids)], mode=0)
+
+        super(RetinaInputIndividual, self).__init__([('photon',uids)], mode=0,
+                                                    input_file = input_file,
+                                                    input_interval = input_interval)
 
     def pre_run(self):
         self.generate_receptive_fields()
         self.generate_datafiles()
-        self.input_file_handle = h5py.File(self.input_file, 'w')
-        self.input_file_handle.create_dataset(
-                    '/array',
-                    (0, self.num_photoreceptors),
-                    dtype=np.float64,
-                    maxshape=(None, self.num_photoreceptors))
-    
+        # self.input_file_handle = h5py.File(self.input_file, 'w')
+        # self.input_file_handle.create_dataset(
+        #             '/array',
+        #             (0, self.num_photoreceptors),
+        #             dtype=np.float64,
+        #             maxshape=(None, self.num_photoreceptors))
+
     def generate_datafiles(self):
         screen = self.screen
         config = self.config
         #retina = self.retina
         pr_list = self.pr_list
         rfs = self.rfs
-        
+
         user_id = self.user_id
-        
+
         screen.setup_file('intensities_{}.h5'.format(user_id))
 
         retina_elev_file = 'retina_elev_{}.h5'.format(user_id)
@@ -67,9 +70,9 @@ class RetinaInputIndividual(BaseInputProcessor):
 
         retina_dima_file = 'retina_dima_{}.h5'.format(user_id)
         retina_dimb_file = 'retina_dimb_{}.h5'.format(user_id)
-        
-        self.input_file = '{}_{}.h5'.format(
-                                config['Retina']['input_file'], user_id)
+
+        # self.input_file = '{}_{}.h5'.format(
+        #                         config['Retina'].get('input_file', 'retina_input'), user_id)
 
         #elev_v, azim_v = retina.get_ommatidia_pos()
         elev_v = np.array([a[1]['elev_3d'] for a in pr_list])
@@ -82,13 +85,13 @@ class RetinaInputIndividual(BaseInputProcessor):
                                (rfs.refa, retina_dima_file),
                                (rfs.refb, retina_dimb_file)]:
             write_array(data, filename)
-    
+
         self.file_open = False
 
     def generate_receptive_fields(self):
         #TODO intensities file should also be written but is omitted for
         # performance reasons
-        
+
         #retina = self.retina
         pr_list = self.pr_list
         screen = self.screen
@@ -97,7 +100,7 @@ class RetinaInputIndividual(BaseInputProcessor):
 
         mapdr_cls = cls_map.get_mapdr_cls(screen_type)
         projection_map = mapdr_cls(self.retina_radius, screen.radius)
-        
+
         pos_elev = np.array([a[1]['elev_3d'] for a in pr_list])
         pos_azim = np.array([a[1]['azim_3d'] for a in pr_list])
         dir_elev = np.array([a[1]['optic_axis_elev'] for a in pr_list])
@@ -118,26 +121,26 @@ class RetinaInputIndividual(BaseInputProcessor):
 
         rfs.generate_filters()
         self.rfs = rfs
-    
+
     def update_input(self):
         im = self.screen.get_screen_intensity_steps(1)
         # reshape neede for inputs in order to write file to an array
         inputs = self.rfs.filter_image_use(im).get().reshape((1,-1))
-        dataset_append(self.input_file_handle['/array'],
-                       inputs)
+        # dataset_append(self.input_file_handle['/array'],
+        #                inputs)
         self.variables['photon']['input'][:] = inputs
-                         
-    
+
+
     def is_input_available(self):
         return True
-    
+
     def post_run(self):
-        self.input_file_handle.close()
+        pass
+        # self.input_file_handle.close()
 
 
-    def __del__(self):
-        try:
-            self.input_file_handle.close()
-        except:
-            pass
-    
+    # def __del__(self):
+    #     try:
+    #         self.input_file_handle.close()
+    #     except:
+    #         pass
