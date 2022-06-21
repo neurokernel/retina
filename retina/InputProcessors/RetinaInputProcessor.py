@@ -21,27 +21,29 @@ class RetinaInputProcessor(BaseInputProcessor):
 
         uids = ['neuron_{}_{}_photon'.format(name, i) for i in range(retina.num_elements)
                 for name in ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']]
-
-
-        super(RetinaInputProcessor, self).__init__([('photon',uids)], mode=0)
+        super(RetinaInputProcessor, self).__init__([('photon',uids)], mode=0,
+                                                   input_file = '{}.h5'.format(config['Retina']['input_file']))
+        # self.set_metadata({'screentype': config['Retina']['screentype'],
+        #                    'rings': config['Retina']['rings'],
+        #                    'intype': config['Retina']['intype']})
 
     def pre_run(self):
         self.generate_receptive_fields()
         self.generate_datafiles()
-        self.input_file_handle = h5py.File(self.input_file, 'w')
-        self.input_file_handle.create_dataset('metadata', (), 'i')
-        self.input_file_handle['metadata'].attrs['dt'] = self.config['General']['dt']
-        self.input_file_handle['metadata'].attrs['screentype'] = self.config['Retina']['screentype']
-        self.input_file_handle['metadata'].attrs['rings'] = self.config['Retina']['rings']
-        self.input_file_handle['metadata'].attrs['dt'] = self.config['Retina']['intype']
-        self.input_file_handle.create_dataset(
-                'photon/data',
-                (0, self.retina.num_photoreceptors),
-                dtype=np.float64,
-                maxshape=(None, self.retina.num_photoreceptors))
-        self.input_file_handle.create_dataset(
-                'photon/uids',
-                data=np.array(self.variables['photon']['uids'], dtype = 'S'))
+        # self.input_file_handle = h5py.File(self.input_file, 'w')
+        # self.input_file_handle.create_dataset('metadata', (), 'i')
+        # self.input_file_handle['metadata'].attrs['dt'] = self.config['General']['dt']
+        # self.input_file_handle['metadata'].attrs['screentype'] = self.config['Retina']['screentype']
+        # self.input_file_handle['metadata'].attrs['rings'] = self.config['Retina']['rings']
+        # self.input_file_handle['metadata'].attrs['intype'] = self.config['Retina']['intype']
+        # self.input_file_handle.create_dataset(
+        #         'photon/data',
+        #         (0, self.retina.num_photoreceptors),
+        #         dtype=np.float64,
+        #         maxshape=(None, self.retina.num_photoreceptors))
+        # self.input_file_handle.create_dataset(
+        #         'photon/uids',
+        #         data=np.array(self.variables['photon']['uids'], dtype = 'S'))
 
     def generate_datafiles(self):
         screen = self.screen
@@ -59,8 +61,6 @@ class RetinaInputProcessor(BaseInputProcessor):
 
         retina_dima_file = 'retina_dima.h5'
         retina_dimb_file = 'retina_dimb.h5'
-
-        self.input_file = '{}.h5'.format(config['Retina']['input_file'])
 
         elev_v, azim_v = retina.get_ommatidia_pos()
 
@@ -105,10 +105,10 @@ class RetinaInputProcessor(BaseInputProcessor):
         im = self.screen.get_screen_intensity_steps(1)
         # reshape neede for inputs in order to write file to an array
         inputs = self.rfs.filter_image_use(im).get().reshape((-1))
-        self.input_file_handle['photon/data'].resize(
-            (self.input_file_handle['photon/data'].shape[0]+1,
-             len(self.variables['photon']['uids'])))
-        self.input_file_handle['photon/data'][-1,:] = inputs
+        # self.input_file_handle['photon/data'].resize(
+        #     (self.input_file_handle['photon/data'].shape[0]+1,
+        #      len(self.variables['photon']['uids'])))
+        # self.input_file_handle['photon/data'][-1,:] = inputs
         self.variables['photon']['input'][:] = inputs
 
 
