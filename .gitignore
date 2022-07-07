@@ -1,4 +1,4 @@
-*.cfg
+
 
 !*template*
 
@@ -7,7 +7,6 @@
 *.gexf.gz
 *.h5
 *.mat
-*.mp4
 *.log
 *.png
 *.pyc
