@@ -68,6 +68,7 @@ class Screen(object):
         self.screen_write_step = config['Retina']['screen_write_step']
 
     def setup_file(self, filename, read=False):
+        # read shall be: False, 'Video', 'File'
         """ tell self to use filename instead of generating video """
         self.file_open = False
         self.filename = filename
@@ -105,7 +106,10 @@ class Screen(object):
             else:
                 # values on 2D
                 images = self._image2d.generate_2dimage(num_steps)
-                images = images[:,::-1,::-1]
+                # actually np.shape(image)[0] is always 1 
+                #images = images[:,::-1,::-1]
+                images = images[:,::-1, ::-1]
+                #print(f'screen image is of {np.shape(images)}')
                 # values on screen
                 screens = self._interpolator.interpolate(images)
 

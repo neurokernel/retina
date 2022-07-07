@@ -16,15 +16,18 @@ class Image2D(object):
 
         # number of 'pixels' in each dimension
         self.shape = tuple(config['InputType']['shape'])
+        #self.shape = tuple([self.shape[1], self.shape[0]])
         self.infilename = config['InputType']['infilename']
         self.writefile = config['InputType']['writefile']
 
     def get_grid(self, xmin, xmax, ymin, ymax):
+        print(f'the size of origin grid is x{self.shape[0]}, y{self.shape[1]}')
         return [np.linspace(xmin, xmax, self.shape[0]),
                 np.linspace(ymin, ymax, self.shape[1])]
 
     def generate_2dimage(self, num_steps):
-        im_v = np.empty((num_steps,) + self.shape, dtype=self.dtype)
+        #im_v = np.empty((num_steps,) + self.shape, dtype=self.dtype)
+        im_v = np.empty((num_steps,self.shape[1],self.shape[0]), dtype=self.dtype)
         for i in range(num_steps):
             im_v[i] = self._generate_2dimage_step(self._internal_step)
             self._internal_step += 1
@@ -115,7 +118,7 @@ class Bar(Image2D, BaseImage):
         self.reset()
 
     def _generate_2dimage_step(self, step):
-        shape = self.shape
+        shape = tuple([self.shape[1], self.shape[0]])
 
         im = np.ones(shape, dtype=self.dtype)*self.levels[0]
         if self.dir == 'v':  # vertical movement
@@ -217,7 +220,6 @@ class Natural(Image2D):
 
     def set_parameters(self, config):
         np.random.seed(config['seed'])
-
         self.store_coords = config['store_coords']
         self.coord_file_name = config['coord_file']
         self.image_file = config['image_file']
@@ -267,6 +269,7 @@ class Natural(Image2D):
         # photons are stored with unit photons/sec
         dt = self.dt
         shape = self.shape
+        #shape = tuple([self.shape[1], self.shape[0]])
         vx = self.vx
         vy = self.vy
         image = self.image
@@ -285,7 +288,8 @@ class Natural(Image2D):
 
         h_im, w_im = image.shape
 
-        im_v = np.empty((num_steps,) + shape, dtype=self.dtype)
+        im_v = np.empty((num_steps,self.shape[1],self.shape[0]), dtype=self.dtype)
+        #im_v = np.empty((num_steps,)+self.shape, dtype=self.dtype)
         for i in range(num_steps):
             imagex = imagex + vx*dt
             imagey = imagey + vy*dt
@@ -310,8 +314,8 @@ class Natural(Image2D):
                 vy = -vy
 
             # decimal indices are allowed and decimal part is ignored
-            im_v[i] = image[int(np.around(imagex)):int(np.around(imagex)) + shape[0],
-                            int(np.around(imagey)):int(np.around(imagey)) + shape[1]]
+            im_v[i] = image[int(np.around(imagex)):int(np.around(imagex)) + self.shape[1],
+                            int(np.around(imagey)):int(np.around(imagey)) + self.shape[0]]
             xy[i, :] = (imagex, imagey)  # convert to int
 
             # change speed/direction every about 1/dt steps
@@ -332,6 +336,8 @@ class Natural(Image2D):
             # for multiple calls file opening and closing has to be split
             write_array(im_v, self.infilename, complevel=9)
 
+        #return im_v.swapaxes(1, 2)
+        im_v = im_v[:, :, ::-1]
         return im_v
 
     # Not used, class overrides generate_2dimage
@@ -340,9 +346,55 @@ class Natural(Image2D):
         pass
 
 
+class Video(Image2D):
+    def __init__(self, config):
+        super(Video, self).__init__(config)
+        input_config = self.get_input_config(config)
+        self.set_parameters(input_config)
+        
+
+    def set_parameters(self, config):
+
+        self.video_file = config['video_file']
+        self.steps = config['steps']
+        self.video_array = self.load_video()
+        self.shape = tuple([np.shape(self.video_array)[2], np.shape(self.video_array)[1]])
+        self.retina_input_video = self.adapt_video()
+        self.file_open = False
+        self.reset()
+
+
+    def load_video(self):
+        from retina.input.video_reader import video_capture, video_adapter
+        try:
+            video_array = video_capture(self.video_file)
+        except AttributeError:
+            print('Tried to read video before setting the file variable')
+            raise
+        except IOError:
+            if self.video_file is None:
+                print('Video file not specified')
+            raise
+  
+        return video_array
+    
+    def adapt_video(self):
+        from retina.input.video_reader import video_capture, video_adapter
+        #steps = config['General']['steps']
+        steps = self.steps
+        dt = self.dt
+        retina_input_video, retina_input_video_info = video_adapter(self.video_array, dt, steps)
+        retina_input_video = retina_input_video[:, :, ::-1]
+        return retina_input_video
+        
+
+    def _generate_2dimage_step(self, step):
+        return self.retina_input_video[step]
+
+
 def image2Dfactory(input_type):
-    # I think this implementation will find only the classes defined in this
-    # file
+    # I think this implementation will find only the classes defined in this file
+    # I think so, but isn't it enough?
     all_image2d_cls = Image2D.__subclasses__()
     all_image2d_names = [cls.__name__ for cls in all_image2d_cls]
     try:
@@ -384,28 +436,35 @@ def savemp4(images, videofile, step=10):
     from matplotlib import cm
     from matplotlib.animation import FFMpegFileWriter, AVConvFileWriter
     import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation, PillowWriter, MovieWriter
+    import matplotlib.animation as animation
+    
+    # this is written with matplotlib 3.0, the old version may not work anymore
+    images_cut = images[::step, :, :]
+    def update_plot(frame_number, images_cut, plot):
+        if frame_number%50 == 0:
+            print(f'now is {frame_number}th frame')
+        
+        plot[0].remove()
+        plot[0] = ax.imshow(images_cut[frame_number], 
+                            cmap=cm.Greys_r, vmin=images_cut.min(), vmax=images_cut.max())
+    
+    
+    fig = plt.figure(figsize=(5, 5))
+    ax = fig.add_subplot(1, 1, 1)
 
-    fig = plt.figure(figsize=plt.figaspect(1.0))
 
-    writer = FFMpegFileWriter(fps=5, codec='mpeg4')
-    writer.setup(
-        fig, videofile, dpi=80,
-        frame_prefix=os.path.splitext(videofile)[0]+'_')
-    writer.frame_format = 'png'
+    plot = [ax.imshow(images_cut[0], cmap=cm.Greys_r, vmin=images_cut.min(), vmax=images_cut.max())]
+    ax.set_title('input before mapping into screen')
 
-    plt.hold(False)
+    fps = 10
+    frn = len(images_cut)
+    ani = animation.FuncAnimation(fig, update_plot, frn, fargs=(images_cut, plot), interval=1000/fps)
 
-    ax = fig.add_subplot(111)
 
-    plt.subplots_adjust(left=0, right=1.0)
-    for i in range(0, len(images), step):
-        ax.imshow(images[i], cmap=cm.Greys_r,
-                  vmin=images.min(), vmax=images.max())
-        fig.canvas.draw()
-        writer.grab_frame()
-
-    writer.finish()
-
+    Writer = animation.writers['ffmpeg']
+    ani.save('motoko.mp4', writer=Writer(fps=10))
+    
 
 def main():
     from neurokernel.tools.timing import Timer
@@ -431,18 +490,23 @@ def main():
                         'temp_{}.png'.format(imtype))
 
         if write_screen:
+            print('motoko!')
+            print(type(images))
+            print(np.shape(images))
             print('Images: \n{}'.format(images))
 
     def get_config():
-        conf_name = os.path.join('retina', 'config',
-                                 'template.cfg')
-        conf_specname = os.path.join('retina', 'config',
-                                     'template_spec.cfg')
+        #conf_name = os.path.join('retina', 'retina', 'input',
+        #                         'template.cfg')
+        conf_name = os.path.join('retina_demo_moving_eye.cfg')
+        conf_specname = os.path.join('template_spec.cfg')
         return ConfigReader(conf_name, conf_specname).conf
+    
     np.set_printoptions(precision=3)
 
-    test_suite = ['Ball', 'Bar', 'FlickerStep', 'Natural']
-
+    #test_suite = ['Ball', 'Bar', 'FlickerStep', 'Natural']
+    test_suite = ['Natural']
+    
     write_video = True
     write_image = False
     write_screen = False

@@ -28,6 +28,17 @@ class ImageTransform(SignalTransform):
         # unpacking
         ogridx, ogridy = self.ogrid
         ngridx, ngridy = self.ngrid
-
+    
+        #f = RectBivariateSpline(ogridx, ogridy, image, kx=1, ky=1)
+        #return f.ev(ngridx.flatten(), ngridy.flatten()).reshape(ngridx.shape)
+        #print(f'the fucking image shape is {np.shape(image)}')
+        #print(f'the origrid shape is x = {np.shape(ogridx)}, y={np.shape(ogridy)}')
+        #print(f'the newgrid shape is x = {np.shape(ngridx)}, y={np.shape(ngridy)}')
+        
+        # put y first since the 1st axis of array is the y not x
         f = RectBivariateSpline(ogridy, ogridx, image, kx=1, ky=1)
-        return f.ev(ngridy.flatten(), ngridx.flatten()).reshape(ngridx.shape)
+        f_new = f.ev(ngridy.flatten(), ngridx.flatten()).reshape(ngridx.shape)
+        #print(f'f_new is of shape {np.shape(f_new)}')
+        return f_new
+        #return f.ev(ngridy.flatten(), ngridx.flatten())
+
