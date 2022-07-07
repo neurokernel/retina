@@ -13,6 +13,7 @@
 *.sh
 *.swp
 *.zip
+.ipynb_checkpoints
 
 !examples/image1.mat
 
