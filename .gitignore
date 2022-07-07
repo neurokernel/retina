@@ -14,6 +14,9 @@
 *.swp
 *.zip
 .ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+.DS_Store
 
 !examples/image1.mat
 
