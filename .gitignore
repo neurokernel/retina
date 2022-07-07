@@ -17,6 +17,7 @@
 */.ipynb_checkpoints/*
 
 *.DS_Store
+**/.DS_Store
 
 !examples/image1.mat
 
