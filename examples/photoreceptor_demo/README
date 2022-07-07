@@ -1,3 +1,0 @@
-This example executes a photoreceptor for 1 second. The input to the photoreceptor is a step function starting from 0.2 second. The strength of the input is set to 10000 photons/s.
-
-To change the input to the photoreceptor, use a different InputProcessor on line 70.
