@@ -26,13 +26,20 @@ def video_capture(video_file_name, scale):
         # make RGB to gray
         #ash_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         ash_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).astype(np.double)
-        ash_image *= scale/np.max(ash_image)
-        #ash_image.astype('uint8')
-        video_array [fc, :, :] = ash_image.astype(np.double)
+        #ash_image *= scale/np.max(ash_image)
+        
+        video_array [fc, :, :] = ash_image
         fc += 1
     cap.release()
+    
+    #then scale the video
+    # intensity to photon_numbers
+    
+    video_array *= scale/np.max(video_array)
+    
     return video_array
     
+        
 def video_adapter(video_array, T, steps):
     # whatever the time length of origin video is, we always convert it to adapt to the retina model, 
     # which is defined in configuration file
