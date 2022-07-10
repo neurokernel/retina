@@ -93,6 +93,7 @@ class RetinaInputProcessor(BaseInputProcessor):
             vrf_cls = cls_map.get_vrf_cls(screen_type)
         else:
             vrf_cls = cls_map.get_vrf_no_gpu_cls(screen_type)
+        #print(f'screen.grid is {np.shape(screen.grid)}')
         rfs = vrf_cls(screen.grid)
         rfs.load_parameters(refa=rf_params[0], refb=rf_params[1],
                             acceptance_angle=retina.get_angle(),
@@ -103,12 +104,15 @@ class RetinaInputProcessor(BaseInputProcessor):
 
     def update_input(self):
         im = self.screen.get_screen_intensity_steps(1)
+        #print(f'the shape of get_screen_intensity is {np.shape(im)}')
         # reshape neede for inputs in order to write file to an array
         inputs = self.rfs.filter_image_use(im).get().reshape((-1))
-        # self.input_file_handle['photon/data'].resize(
-        #     (self.input_file_handle['photon/data'].shape[0]+1,
-        #      len(self.variables['photon']['uids'])))
-        # self.input_file_handle['photon/data'][-1,:] = inputs
+        '''
+        self.input_file_handle['photon/data'].resize(
+             (self.input_file_handle['photon/data'].shape[0]+1,
+              len(self.variables['photon']['uids'])))
+        self.input_file_handle['photon/data'][-1,:] = inputs
+        '''
         self.variables['photon']['input'][:] = inputs
 
 

@@ -1,4 +1,4 @@
-*.cfg
+
 
 !*template*
 
@@ -7,13 +7,17 @@
 *.gexf.gz
 *.h5
 *.mat
-*.mp4
 *.log
 *.png
 *.pyc
 *.sh
 *.swp
 *.zip
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+*.DS_Store
+**/.DS_Store
 
 !examples/image1.mat
 

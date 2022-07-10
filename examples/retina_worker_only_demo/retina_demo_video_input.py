@@ -49,7 +49,7 @@ def get_worker_num_neurons(j, total_neurons, worker_num):
 
 
 def add_retina_LPU(config, i, retina, manager):
-    dt = config['General']['dt']
+    T = config['General']['dt']
     debug = config['Retina']['debug']
     time_sync = config['Retina']['time_sync']
 
@@ -63,6 +63,7 @@ def add_retina_LPU(config, i, retina, manager):
 
     inputmethod = config['Retina']['inputmethod']
     if inputmethod == 'read':
+       
         print('Reading from previously generated input')
         print('The configuration must stay the same.')
         input_processor = FileInputProcessor('{}.h5'.format(config['Retina']['input_file']))
@@ -80,7 +81,7 @@ def add_retina_LPU(config, i, retina, manager):
 
     extra_comps = [PhotoreceptorModel, BufferPhoton]
 
-    manager.add(LPU, retina_id, dt, comp_dict, conns,
+    manager.add(LPU, retina_id, T, comp_dict, conns,
                 device = i, input_processors = [input_processor],
                 output_processors = [output_processor],
                 debug=debug, time_sync=time_sync, extra_comps = extra_comps)

@@ -28,6 +28,10 @@ class ImageTransform(SignalTransform):
         # unpacking
         ogridx, ogridy = self.ogrid
         ngridx, ngridy = self.ngrid
-
+    
+        
+        # put y first since the 1st axis of array is the y not x
         f = RectBivariateSpline(ogridy, ogridx, image, kx=1, ky=1)
-        return f.ev(ngridy.flatten(), ngridx.flatten()).reshape(ngridx.shape)
+        f_new = f.ev(ngridy.flatten(), ngridx.flatten()).reshape(ngridx.shape)
+        return f_new
+
