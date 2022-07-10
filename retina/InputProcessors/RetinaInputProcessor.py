@@ -11,7 +11,6 @@ from neurokernel.LPU.InputProcessors.BaseInputProcessor import BaseInputProcesso
 
 class RetinaInputProcessor(BaseInputProcessor):
     def __init__(self, config, retina):
-        self.for_test = 39
         self.config = config
 
         self.screen_type = config['Retina']['screentype']

@@ -70,7 +70,6 @@ def add_retina_LPU(config, i, retina, manager):
     else:
         print('Using input generating function')
         input_processor = RetinaInputProcessor(config, retina)
-        print(input_processor.for_test)
 
     output_processor = FileOutputProcessor([('V',None)], output_file, sample_interval=1)
 

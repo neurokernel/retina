@@ -357,9 +357,12 @@ class Video(Image2D):
 
         self.video_file = config['video_file']
         self.steps = config['steps']
+        self.scale = config['scale']
         self.video_array = self.load_video()
         self.shape = tuple([np.shape(self.video_array)[2], np.shape(self.video_array)[1]])
-        self.retina_input_video = self.adapt_video()
+        self.retina_frames = self.adapt_frames()
+        #self.retina_input_video = self.adapt_video()
+        #self.retina_input_video *= self.scale/np.max(self.retina_input_video)
         self.file_open = False
         self.reset()
 
@@ -367,7 +370,7 @@ class Video(Image2D):
     def load_video(self):
         from retina.input.video_reader import video_capture, video_adapter
         try:
-            video_array = video_capture(self.video_file)
+            video_array = video_capture(self.video_file, self.scale)
         except AttributeError:
             print('Tried to read video before setting the file variable')
             raise
@@ -376,9 +379,17 @@ class Video(Image2D):
                 print('Video file not specified')
             raise
   
-        return video_array
+        return video_array[:, :, ::-1]
+
+    def adapt_frames(self):
+        from retina.input.video_reader import video_capture, video_adapter, frames_adapter
+        steps = self.steps
+        dt = self.dt
+        retina_input_frames = frames_adapter(self.video_array, dt, steps)
+        return retina_input_frames
     
     def adapt_video(self):
+        # may use too much memory, stop using this one
         from retina.input.video_reader import video_capture, video_adapter
         #steps = config['General']['steps']
         steps = self.steps
@@ -389,7 +400,10 @@ class Video(Image2D):
         
 
     def _generate_2dimage_step(self, step):
-        return self.retina_input_video[step]
+        frame_index_now = int(self.retina_frames[step])
+        frame_now = self.video_array[frame_index_now]
+        return frame_now
+        #return self.retina_input_video[step]
 
 
 def image2Dfactory(input_type):
