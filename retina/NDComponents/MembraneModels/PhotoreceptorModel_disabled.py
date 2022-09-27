@@ -9,7 +9,7 @@ from neurokernel.LPU.utils.simpleio import *
 
 from neurokernel.LPU.NDComponents.MembraneModels.BaseMembraneModel import BaseMembraneModel
 
-class PhotoreceptorModel(BaseMembraneModel):
+class PhotoreceptorModel_disabled(BaseMembraneModel):
     accesses = ['photon', 'I']
     updates = ['V']
 
@@ -80,7 +80,7 @@ class PhotoreceptorModel(BaseMembraneModel):
     def _setup_output(self):
         outputfile = self.LPU_id + '_out'
         if self.record_neuron:
-            self.outputfile_I = h5py.File(outputfile+'I.h5', 'a')
+            self.outputfile_I = h5py.File(outputfile+'I.h5', 'w')
             self.outputfile_I.create_dataset(
                 '/array', (0, self.num_neurons), dtype = self.dtype,
                 maxshape = (None, self.num_neurons))
@@ -133,12 +133,10 @@ class PhotoreceptorModel(BaseMembraneModel):
                                  np.int32) - 1
         change_ind2 = np.asarray([1, 1, 3, 4, 1, 1, 1, 1, 1, 7, 1, 1, 1, 1],
                                  np.int32) - 1
-        change1 = np.asarray([0, -1, -1, -1, -1, 1, 1, -1, -1, -2, -1, 1, -1, 1], np.int32)
-        
-        change2 = np.asarray([0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0], np.int32)
-
-        #change1 = np.asarray([0, -1, -1, -1, -1, 1, 1, 0, -1, -2, -1, 1, -1, 1], np.int32)
-        
+        change1 = np.asarray([0, -1, -1, -1, -1, 1, 1, -1, -1, -2, -1, 1, -1, 1],
+                             np.int32)
+        change2 = np.asarray([0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+                             np.int32)
 
         self.transduction_func = get_transduction_func(
             self.dtype, self.block_transduction[0], Xaddress,
@@ -230,65 +228,6 @@ class PhotoreceptorModel(BaseMembraneModel):
 
 
 def get_update_ns_func(dtype, compile_options):
-    template = """
-
-#define RTAU 1.0
-__global__ void
-update_ns(%(type)s* g_ns, int num_neurons, %(type)s* V, %(type)s dt)
-{
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-
-    if(tid < num_neurons) {
-
-        %(type)s v = V[tid];
-        %(type)s ns = g_ns[tid];
-        %(type)s n_inf;
-
-        if(v >= -53)
-            n_inf = 8.5652*(v+53)+5;
-        else
-            n_inf = fmax%(fletter)s(1.0, 0.2354*(v+70)+1);
-
-        g_ns[tid] = ns + (n_inf-ns)*RTAU*dt;
-
-    }
-}
-"""
-    scalartype = dtype.type if isinstance(dtype, np.dtype) else dtype
-    mod = SourceModule(template % {"type": dtype_to_ctype(dtype),
-                                   "fletter": 'f' if scalartype == np.float32 else ''},
-                       options = compile_options)
-    func = mod.get_function('update_ns')
-    func.prepare('PiP'+np.dtype(dtype).char)#[np.intp, np.int32, np.intp, scalartype])
-    return func
-
-def get_re_sort_func(dtype, compile_options):
-    template = """
-
-__global__ void
-resort(%(type)s* in_photos, %(type)s* out_photons, int* pre, int* npre,
-       int* cumpre, int num_neurons)
-{
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    int total_threads = blockDim.x * gridDim.x;
-
-    for(int i = tid; i < num_neurons; i += total_threads)
-    {
-        if(npre[i])
-            out_photons[i] = in_photos[pre[cumpre[i]]];
-    }
-}
-"""
-    mod = SourceModule(template % {"type": dtype_to_ctype(dtype)},
-                       options = compile_options)
-    func = mod.get_function('resort')
-    func.prepare('PPPPPi')
-    return func
-
-
-def get_transduction_func(dtype, block_size, Xaddress,
-                          change_ind1, change_ind2, change1, change2, compile_options):
-   
 
     template_run = """
 

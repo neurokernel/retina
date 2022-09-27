@@ -80,7 +80,7 @@ class PhotoreceptorModel(BaseMembraneModel):
     def _setup_output(self):
         outputfile = self.LPU_id + '_out'
         if self.record_neuron:
-            self.outputfile_I = h5py.File(outputfile+'I.h5', 'a')
+            self.outputfile_I = h5py.File(outputfile+'I.h5', 'w')
             self.outputfile_I.create_dataset(
                 '/array', (0, self.num_neurons), dtype = self.dtype,
                 maxshape = (None, self.num_neurons))
@@ -133,12 +133,10 @@ class PhotoreceptorModel(BaseMembraneModel):
                                  np.int32) - 1
         change_ind2 = np.asarray([1, 1, 3, 4, 1, 1, 1, 1, 1, 7, 1, 1, 1, 1],
                                  np.int32) - 1
-        change1 = np.asarray([0, -1, -1, -1, -1, 1, 1, -1, -1, -2, -1, 1, -1, 1], np.int32)
-        
-        change2 = np.asarray([0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0], np.int32)
-
-        #change1 = np.asarray([0, -1, -1, -1, -1, 1, 1, 0, -1, -2, -1, 1, -1, 1], np.int32)
-        
+        change1 = np.asarray([0, -1, -1, -1, -1, 1, 1, -1, -1, -2, -1, 1, -1, 1],
+                             np.int32)
+        change2 = np.asarray([0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+                             np.int32)
 
         self.transduction_func = get_transduction_func(
             self.dtype, self.block_transduction[0], Xaddress,
@@ -288,7 +286,356 @@ resort(%(type)s* in_photos, %(type)s* out_photons, int* pre, int* npre,
 
 def get_transduction_func(dtype, block_size, Xaddress,
                           change_ind1, change_ind2, change1, change2, compile_options):
-   
+    template = """
+/* This is kept for documentation purposes the actual code used is after the end
+ * of this template */
+#include "curand_kernel.h"
+
+extern "C" {
+#include "stdio.h"
+
+#define BLOCK_SIZE %(block_size)d
+#define LA 0.5
+
+/* Simulation Constants */
+#define C_T     0.5     /* Total concentration of calmodulin */
+#define G_T     50      /* Total number of G-protein */
+#define PLC_T   100     /* Total number of PLC */
+#define T_T     25      /* Total number of TRP/TRPL channels */
+#define I_TSTAR 0.68    /* Average current through one opened TRP/TRPL channel (pA)*/
+
+#define GAMMA_DSTAR     4.0 /* s^(-1) rate constant*/
+#define GAMMA_GAP       3.0 /* s^(-1) rate constant*/
+#define GAMMA_GSTAR     3.5 /* s^(-1) rate constant*/
+#define GAMMA_MSTAR     3.7 /* s^(-1) rate constant*/
+#define GAMMA_PLCSTAR   144 /* s^(-1) rate constant */
+#define GAMMA_TSTAR     25  /* s^(-1) rate constant */
+
+#define H_DSTAR         37.8    /* strength constant */
+#define H_MSTAR         40      /* strength constant */
+#define H_PLCSTAR       11.1    /* strength constant */
+#define H_TSTARP        11.5    /* strength constant */
+#define H_TSTARN        10      /* strength constant */
+
+#define K_P     0.3     /* Dissociation coefficient for calcium positive feedback */
+#define K_P_INV 3.3333  /* K_P inverse ( too many decimals are not important) */
+#define K_N     0.18    /* Dissociation coefficient for calmodulin negative feedback */
+#define K_N_INV 5.5555  /* K_N inverse ( too many decimals are not important) */
+#define K_U     30      /* (mM^(-1)s^(-1)) Rate of Ca2+ uptake by calmodulin */
+#define K_R     5.5     /* (mM^(-1)s^(-1)) Rate of Ca2+ release by calmodulin */
+#define K_CA    1000    /* s^(-1) diffusion from microvillus to somata (tuned) */
+
+#define K_NACA  3e-8    /* Scaling factor for Na+/Ca2+ exchanger model */
+
+#define KAPPA_DSTAR         1300.0  /* s^(-1) rate constant - there is also a capital K_DSTAR */
+#define KAPPA_GSTAR         7.05    /* s^(-1) rate constant */
+#define KAPPA_PLCSTAR       15.6    /* s^(-1) rate constant */
+#define KAPPA_TSTAR         150.0   /* s^(-1) rate constant */
+#define K_DSTAR             100.0   /* rate constant */
+
+#define F                   96485   /* (mC/mol) Faraday constant (changed from paper)*/
+#define N                   4       /* Binding sites for calcium on calmodulin */
+#define R                   8.314   /* (J*K^-1*mol^-1)Gas constant */
+#define T                   293     /* (K) Absolute temperature */
+#define VOL                 3e-9    /* changed from 3e-12microlitres to nlitres
+                                     * microvillus volume so that units agree */
+
+#define N_S0_DIM        1   /* initial condition */
+#define N_S0_BRIGHT     2
+
+#define A_N_S0_DIM      4   /* upper bound for dynamic increase (of negetive feedback) */
+#define A_N_S0_BRIGHT   200
+
+#define TAU_N_S0_DIM    3000    /* time constant for negative feedback */
+#define TAU_N_S0_BRIGHT 1000
+
+#define NA_CO           120     /* (mM) Extracellular sodium concentration */
+#define NA_CI           8       /* (mM) Intracellular sodium concentration */
+#define CA_CO           1.5     /* (mM) Extracellular calcium concentration */
+
+#define G_TRP           8       /* conductance of a TRP channel */
+#define TRP_REV         0       /* TRP channel reversal potential (mV) */
+
+__device__ __constant__ long long int d_X[5];
+__device__ __constant__ int change_ind1[14];
+__device__ __constant__ int change1[14];
+__device__ __constant__ int change_ind2[14];
+__device__ __constant__ int change2[14];
+
+/* cc = n/(NA*VOL) [6.0221413e+23 mol^-1 * 3*10e-21 m^3] */
+__device__ float num_to_mM(int n)
+{
+    return n * 5.5353e-4; // n/1806.6;
+}
+
+/* n = cc*VOL*NA [6.0221413e+23 mol^-1 * 3*10e-21 m^3] */
+__device__ float mM_to_num(float cc)
+{
+    return rintf(cc * 1806.6);
+}
+
+/* Assumes Hill constant (=2) for positive calcium feedback */
+__device__ float compute_fp(float Ca_cc)
+{
+    float tmp = Ca_cc*K_P_INV;
+    tmp *= tmp;
+    return tmp/(1 + tmp);
+}
+
+/* Assumes Hill constant(=3) for negative calmodulin feedback */
+__device__ float compute_fn(float Cstar_cc, float ns)
+{
+    float tmp = Cstar_cc*K_N_INV;
+    tmp *= tmp*tmp;
+    return ns*tmp/(1 + tmp);
+}
+
+/* Vm [V] */
+__device__ float compute_ca(int Tstar, float Cstar_cc, float Vm)
+{
+    float I_in = Tstar*G_TRP*fmaxf(-Vm + 0.001*TRP_REV, 0);
+    /* CaM = C_T - Cstar_cc */
+    float denom = (K_CA + (N*K_U*C_T) - (N*K_U)*Cstar_cc + 179.0952 * expf(-(F/(R*T))*Vm));  // (K_NACA*NA_CO^3/VOL*F)
+    /* I_Ca ~= 0.4*I_in */
+    float numer = (0.4*I_in)/(2*VOL*F) +
+                  ((K_NACA*CA_CO*NA_CI*NA_CI*NA_CI)/(VOL*F)) +  // in paper it's -K_NACA... due to different conventions
+                  N*K_R*Cstar_cc;
+
+    return fmaxf(1.6e-4, numer/denom);
+}
+
+__global__ void
+transduction(curandStateXORWOW_t *state, float dt, %(type)s* d_Vm,
+             %(type)s* g_ns, %(type)s* input,
+             int* num_microvilli, int total_microvilli, int* count)
+{
+    int tid = threadIdx.x;
+    int gid = threadIdx.x + blockIdx.x * blockDim.x;
+    int wid = tid %% 32;
+    int wrp = tid >> 5;
+
+    __shared__ int X[BLOCK_SIZE][7];  // number of molecules
+    __shared__ float Ca[BLOCK_SIZE];
+    __shared__ float fn[BLOCK_SIZE];
+
+    float Vm, ns, lambda;
+
+    float sumrate, dt_advanced;
+    int reaction_ind;
+    ushort2 tmp;
+
+
+    // copy random generator state locally to avoid accessing global memory
+    curandStateXORWOW_t localstate = state[gid];
+
+
+    int mid; // microvilli ID
+    volatile __shared__ int mi[4]; // starting point of mid per ward
+
+    // use atomicAdd to obtain the starting mid for the warp
+    if(wid == 0)
+    {
+        mi[wrp] = atomicAdd(count, 32);
+    }
+    mid = mi[wrp] + wid;
+    int ind;
+
+    while(mid < total_microvilli)
+    {
+        // load photoreceptor index of the microvilli
+        ind = ((ushort*)d_X[4])[mid];
+
+        // load variables that are needed for computing calcium concentration
+        tmp = ((ushort2*)d_X[2])[mid];
+        X[tid][5] = tmp.x;
+        X[tid][6] = tmp.y;
+
+        Vm = d_Vm[ind]*1e-3;
+        ns = g_ns[ind];
+
+        // update calcium concentration
+        Ca[tid] = compute_ca(X[tid][6], num_to_mM(X[tid][5]), Vm);
+        fn[tid] = compute_fn(num_to_mM(X[tid][5]), ns);
+
+        lambda = input[ind]/num_microvilli[ind];
+
+        // load the rest of variables
+        tmp = ((ushort2*)d_X[1])[mid];
+        X[tid][4] = tmp.y;
+        X[tid][3] = tmp.x;
+        tmp = ((ushort2*)d_X[0])[mid];
+        X[tid][2] = tmp.y;
+        X[tid][1] = tmp.x;
+        X[tid][0] = ((ushort*)d_X[3])[mid];
+
+        // compute total rate of reaction
+        sumrate = lambda;
+        sumrate += mM_to_num(K_U) * Ca[tid] * (0.5 - num_to_mM(X[tid][5]) );  //11
+        sumrate += mM_to_num(K_R) * num_to_mM(X[tid][5]);  //12
+        sumrate += GAMMA_TSTAR * (1 + H_TSTARN*fn[tid]) * X[tid][6];  // 10
+        sumrate += GAMMA_DSTAR * (1 + H_DSTAR*fn[tid]) * X[tid][4];  // 8
+        sumrate += GAMMA_PLCSTAR * (1 + H_PLCSTAR*fn[tid]) * X[tid][3];  // 7
+        sumrate += GAMMA_MSTAR * (1 + H_MSTAR*fn[tid]) * X[tid][0];  // 1
+        sumrate += KAPPA_DSTAR * X[tid][3];  // 6
+        sumrate += GAMMA_GAP * X[tid][2] * X[tid][3];  // 4
+        sumrate += KAPPA_PLCSTAR * X[tid][2] * (PLC_T-X[tid][3]);  // 3
+        sumrate += GAMMA_GSTAR * (G_T - X[tid][2] - X[tid][1] - X[tid][3]);  // 5
+        sumrate += KAPPA_GSTAR * X[tid][1] * X[tid][0];  // 2
+        sumrate += (KAPPA_TSTAR/(K_DSTAR*K_DSTAR)) *
+                   (1 + H_TSTARP*compute_fp( Ca[tid] )) *
+                   X[tid][4]*(X[tid][4]-1)*(T_T-X[tid][6])*0.5 ;  // 9
+
+        // choose the next reaction time
+        dt_advanced = -logf(curand_uniform(&localstate))/(LA + sumrate);
+
+        // If the reaction time is smaller than dt,
+        // pick the reaction and update,
+        // then compute the total rate and next reaction time again
+        // until all dt_advanced is larger than dt.
+        // Note that you don't have to compensate for
+        // the last reaction time that exceeds dt.
+        // The reason is that the exponential distribution is MEMORYLESS.
+        while(dt_advanced <= dt)
+        {
+            reaction_ind = 0;
+            sumrate = curand_uniform(&localstate) * sumrate;
+
+            if(sumrate > 2e-5)
+            {
+
+                sumrate -= lambda;
+                reaction_ind = (sumrate<=2e-5) * 13;
+
+                if(!reaction_ind)
+                {
+
+                    sumrate -= mM_to_num(K_U) * Ca[tid] * (0.5 - num_to_mM(X[tid][5]) );
+                    reaction_ind = (sumrate<=2e-5) * 11;
+
+                    if(!reaction_ind)
+                    {
+                        sumrate -= mM_to_num(K_R) * num_to_mM(X[tid][5]);
+                        reaction_ind = (sumrate<=2e-5) * 12;
+                        if(!reaction_ind)
+                        {
+                            sumrate -= GAMMA_TSTAR * (1 + H_TSTARN*fn[tid]) * X[tid][6];
+                            reaction_ind = (sumrate<=2e-5) * 10;
+                            if(!reaction_ind)
+                            {
+                                sumrate -= GAMMA_DSTAR * (1 + H_DSTAR*fn[tid]) * X[tid][4];
+                                reaction_ind = (sumrate<=2e-5) * 8;
+
+                                if(!reaction_ind)
+                                {
+                                    sumrate -= GAMMA_PLCSTAR * (1 + H_PLCSTAR*fn[tid]) * X[tid][3];
+                                    reaction_ind = (sumrate<=2e-5) * 7;
+                                    if(!reaction_ind)
+                                    {
+                                        sumrate -= GAMMA_MSTAR * (1 + H_MSTAR*fn[tid]) * X[tid][0];
+                                        reaction_ind = (sumrate<=2e-5) * 1;
+                                        if(!reaction_ind)
+                                        {
+                                            sumrate -= KAPPA_DSTAR * X[tid][3];
+                                            reaction_ind = (sumrate<=2e-5) * 6;
+                                            if(!reaction_ind)
+                                            {
+                                                sumrate -= GAMMA_GAP * X[tid][2] * X[tid][3];
+                                                reaction_ind = (sumrate<=2e-5) * 4;
+
+                                                if(!reaction_ind)
+                                                {
+                                                    sumrate -= KAPPA_PLCSTAR * X[tid][2] * (PLC_T-X[tid][3]);
+                                                    reaction_ind = (sumrate<=2e-5) * 3;
+                                                    if(!reaction_ind)
+                                                    {
+                                                        sumrate -= GAMMA_GSTAR * (G_T - X[tid][2] - X[tid][1] - X[tid][3]);
+                                                        reaction_ind = (sumrate<=2e-5) * 5;
+                                                        if(!reaction_ind)
+                                                        {
+                                                            sumrate -= KAPPA_GSTAR * X[tid][1] * X[tid][0];
+                                                            reaction_ind = (sumrate<=2e-5) * 2;
+                                                            if(!reaction_ind)
+                                                            {
+                                                                sumrate -= (KAPPA_TSTAR/(K_DSTAR*K_DSTAR)) *
+                                                                           (1 + H_TSTARP*compute_fp( Ca[tid] )) *
+                                                                           X[tid][4]*(X[tid][4]-1)*(T_T-X[tid][6])*0.5;
+                                                                reaction_ind = (sumrate<=2e-5) * 9;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            int ind;
+
+            // only up to two state variables are needed to be updated
+            // update the first one.
+            ind = change_ind1[reaction_ind];
+            X[tid][ind] += change1[reaction_ind];
+
+            //if(reaction_ind == 9)
+            //{
+            //    X[tid][ind] = max(X[tid][ind], 0);
+            //}
+
+            ind = change_ind2[reaction_ind];
+            //update the second one
+            if(ind != 0)
+            {
+                X[tid][ind] += change2[reaction_ind];
+            }
+
+            // compute the advance time again
+            Ca[tid] = compute_ca(X[tid][6], num_to_mM(X[tid][5]), Vm);
+            fn[tid] = compute_fn( num_to_mM(X[tid][5]), ns );
+            //fp[tid] = compute_fp( Ca[tid] );
+
+            sumrate = lambda;
+            sumrate += mM_to_num(K_U) * Ca[tid] * (0.5 - num_to_mM(X[tid][5]) ); //11
+            sumrate += mM_to_num(K_R) * num_to_mM(X[tid][5]); //12
+            sumrate += GAMMA_TSTAR * (1 + H_TSTARN*fn[tid]) * X[tid][6]; // 10
+            sumrate += GAMMA_DSTAR * (1 + H_DSTAR*fn[tid]) * X[tid][4]; // 8
+            sumrate += GAMMA_PLCSTAR * (1 + H_PLCSTAR*fn[tid]) * X[tid][3]; // 7
+            sumrate += GAMMA_MSTAR * (1 + H_MSTAR*fn[tid]) * X[tid][0]; // 1
+            sumrate += KAPPA_DSTAR * X[tid][3]; // 6
+            sumrate += GAMMA_GAP * X[tid][2] * X[tid][3]; // 4
+            sumrate += KAPPA_PLCSTAR * X[tid][2] * (PLC_T-X[tid][3]);  // 3
+            sumrate += GAMMA_GSTAR * (G_T - X[tid][2] - X[tid][1] - X[tid][3]); // 5
+            sumrate += KAPPA_GSTAR * X[tid][1] * X[tid][0]; // 2
+            sumrate += (KAPPA_TSTAR/(K_DSTAR*K_DSTAR)) *
+                       (1 + H_TSTARP*compute_fp( Ca[tid] )) *
+                       X[tid][4]*(X[tid][4]-1)*(T_T-X[tid][6])*0.5; // 9
+
+            dt_advanced -= logf(curand_uniform(&localstate))/(LA + sumrate);
+
+        } // end while
+
+        ((ushort*)d_X[3])[mid] = X[tid][0];
+        ((ushort2*)d_X[0])[mid] = make_ushort2(X[tid][1], X[tid][2]);
+        ((ushort2*)d_X[1])[mid] = make_ushort2(X[tid][3], X[tid][4]);
+        ((ushort2*)d_X[2])[mid] = make_ushort2(X[tid][5], X[tid][6]);
+
+        if(wid == 0)
+        {
+            mi[wrp] = atomicAdd(count, 32);
+        }
+        mid = mi[wrp] + wid;
+    }
+
+    // copy the updated random generator state back to global memory
+    state[gid] = localstate;
+
+}
+
+}
+"""
 
     template_run = """
 

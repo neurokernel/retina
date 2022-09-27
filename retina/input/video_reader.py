@@ -11,10 +11,7 @@ def video_capture(video_file_name, scale):
 
     fps = cap.get(cv2.CAP_PROP_FPS)
     # frame number now
-    #print(cap.get(cv2.CAP_PROP_POS_FRAMES))
     print(f'the origin video has {total_frames} frames')
-    #print(f' height and width is {frame_height} and {frame_width}')
-    #print(f'fps is {fps}')
 
     video_array = np.empty((total_frames, frame_height, frame_width), dtype=np.double)
 
@@ -35,19 +32,48 @@ def video_capture(video_file_name, scale):
     #then scale the video
     # intensity to photon_numbers
     
-    video_array *= scale/np.max(video_array)
+    video_array *= scale/np.max(video_array) # this is one map
+    # and there is another map...
+    print('setting video minimum=0')
+    # y = ax + b
+    a = np.max(video_array)/(np.max(video_array)-np.min(video_array))
+    b = - (np.max(video_array) * np.min(video_array))/(np.max(video_array)-np.min(video_array))
+    video_array *= a
+    video_array += b
+    print(f'the min of video array is {np.min(video_array)}')
+    print(f'the max of video array is {np.max(video_array)}')
+    return video_array
+
+def video_capture_h5(video_file_name, scale):
+    # literally read a video matrix stored in a h5 file
+    import h5py 
     
+    # first read the matrix from the h5 file
+    h5_video = h5py.File(video_file_name, 'r')
+    h5_key = list(h5_video.keys())[0]
+    video_array = np.array(h5_video[h5_key])[0]
+    
+    #then scale the video
+    # intensity to photon_numbers
+    video_array *= scale/np.max(video_array) # this is one map
+    # and there is another map...
+    print('setting video minimum=0')
+    # y = ax + b
+    a = np.max(video_array)/(np.max(video_array)-np.min(video_array))
+    b = - (np.max(video_array) * np.min(video_array))/(np.max(video_array)-np.min(video_array))
+    video_array *= a
+    video_array += b
+    print(f'the min of video array is {np.min(video_array)}')
+    print(f'the max of video array is {np.max(video_array)}')
     return video_array
     
-        
+    
 def video_adapter(video_array, T, steps):
     # whatever the time length of origin video is, we always convert it to adapt to the retina model, 
     # which is defined in configuration file
     # T and steps are dt & steps in the configuration files. 
     # The input to the retina model has total_frames_number = steps and the frame_interval = T
     # which means we need to duplicate some frames or extract some
-    
-    
      
     fps_retina = 1/T # the actually fps in retina_input
     total_frames, frame_height, frame_width = np.shape(video_array)
@@ -88,8 +114,6 @@ def frames_adapter(video_array, T, steps):
     # The input to the retina model has total_frames_number = steps and the frame_interval = T
     # which means we need to duplicate some frames or extract some
     
-    
-     
     fps_retina = 1/T # the actually fps in retina_input
     total_frames, frame_height, frame_width = np.shape(video_array)
     

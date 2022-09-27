@@ -358,7 +358,13 @@ class Video(Image2D):
         self.video_file = config['video_file']
         self.steps = config['steps']
         self.scale = config['scale']
-        self.video_array = self.load_video()
+        self.video_load_option = config['video_load_option']
+        if self.video_load_option == 'mp4':
+            self.video_array = self.load_video_mp4()
+        elif self.video_load_option == 'h5':
+            self.video_array = self.load_video_h5()
+        else:
+            print('the video format has to be mp4 or h5 right now...')
         self.shape = tuple([np.shape(self.video_array)[2], np.shape(self.video_array)[1]])
         self.retina_frames = self.adapt_frames()
         #self.retina_input_video = self.adapt_video()
@@ -367,10 +373,24 @@ class Video(Image2D):
         self.reset()
 
 
-    def load_video(self):
+    def load_video_mp4(self):
         from retina.input.video_reader import video_capture, video_adapter
         try:
             video_array = video_capture(self.video_file, self.scale)
+        except AttributeError:
+            print('Tried to read video before setting the file variable')
+            raise
+        except IOError:
+            if self.video_file is None:
+                print('Video file not specified')
+            raise
+  
+        return video_array[:, :, ::-1]
+
+    def load_video_h5(self):
+        from retina.input.video_reader import video_capture, video_capture_h5
+        try:
+            video_array = video_capture_h5(self.video_file, self.scale)
         except AttributeError:
             print('Tried to read video before setting the file variable')
             raise
